@@ -124,6 +124,7 @@ export class Hall {
     this.laneMat = new THREE.MeshStandardMaterial({ color: 0xc2c6c9, roughness: .7 });
     this.glassMat = new THREE.MeshPhysicalMaterial({ color: 0xcfe0ea, roughness: .05, transparent: true, opacity: .14, depthWrite: false, side: THREE.DoubleSide });
     this.frameMat = new THREE.MeshStandardMaterial({ color: 0x24272b, roughness: .5, metalness: .4 });
+    this.mullionMat = new THREE.MeshStandardMaterial({ color: 0xb9bfc4, roughness: .4, metalness: .6 });
     this.zoneMat = new THREE.MeshStandardMaterial({ color: 0x2c2f33, roughness: .55, metalness: .05, envMapIntensity: .7 });
     this.yellowMat = new THREE.MeshBasicMaterial({ color: YELLOW });
     this.lineMat = new THREE.MeshStandardMaterial({ color: YELLOW, roughness: .4, emissive: 0x3a3700 });
@@ -195,7 +196,7 @@ export class Hall {
     this.plan = plan;
     const need = new Set();
     for (const d of plan.devices) { const pr = PRODUCTS[d.pid]; if (pr.cad) need.add(pr.cad); }
-    if (plan.machines.some(m => m.zid)) need.add('zidcode');
+    if (plan.machines.some(m => m.zid)) need.add('zidcode_lo');
     const wait = [...need].map(c => this.template(c).catch(() => null));
     if (this.opt.onProgress) {
       let done = 0; wait.forEach(p => p.then(() => this.opt.onProgress(++done / wait.length)));
@@ -241,7 +242,7 @@ export class Hall {
       const size = [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z];
       g.add(this.blob(size[0], size[2]));
       if (m.zid) {
-        const t = await this.template('zidcode');
+        const t = await this.template(this.opt.models.zidcode_lo ? 'zidcode_lo' : 'zidcode');
         if (t) {
           const z = t.clone(); z.userData.zid = true; z.scale.setScalar(.001);
           z.position.set(bb.max.x + .42, 0, bb.max.z - .25); z.rotation.y = -.35;
@@ -316,9 +317,9 @@ export class Hall {
     const rowEnd = x - GAP + 1.4;
     const pathZ = frontZ + 1.0;
     const TW = Math.max(rowEnd + .6, 12);
-    const toolZ1 = Math.max(pathZ + 2.6, lMode ? zCol0 + 1.6 : 0, WALL_Z + 9.5);
+    const toolZ1 = Math.max(pathZ + (carts.length ? 4.2 : 2.8), lMode ? zCol0 + 1.6 : 0, WALL_Z + 7.5);
     // Werkzeugwagen parken an der Tür zur Halle
-    carts.forEach((d, i) => { d.userData.target = [TW - 1.6 - i * 1.9, toolZ1 - 1.5, 0]; });
+    carts.forEach((d, i) => { d.userData.target = [TW - 1.8 - i * 1.9, pathZ + 1.9, 0]; });
     if (carts.length) addStation('supply', ...carts);
     if (lMode) path.push([.5 + colDepth + 1.1, zCol0 - .4], [.5 + colDepth + 1.1, pathZ]);
     else path.push([1.2, pathZ]);
@@ -420,13 +421,16 @@ export class Hall {
     // Glaswand Werkzeugraum (rechts, mit Tür auf Höhe des Weges) + vorne
     const gw = (x, z, len, rot) => {
       const g = new THREE.Mesh(new THREE.PlaneGeometry(len, 2.8), this.glassMat); g.position.set(x, 1.4, z); g.rotation.y = rot; g.renderOrder = 3; this.zoneG.add(g);
-      const top = new THREE.Mesh(new THREE.BoxGeometry(rot ? .06 : len, .06, rot ? len : .06), this.frameMat); top.position.set(x, 2.8, z); this.zoneG.add(top);
+      const top = new THREE.Mesh(new THREE.BoxGeometry(rot ? .04 : len, .04, rot ? len : .04), this.mullionMat); top.position.set(x, 2.8, z); this.zoneG.add(top);
+      for (let k = -len / 2; k <= len / 2 + .01; k += Math.max(1.2, len / Math.ceil(len / 2.4))) {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(.04, 2.8, .04), this.mullionMat);
+        post.position.set(rot ? x : x + k, 1.4, rot ? z + k : z); this.zoneG.add(post);
+      }
     };
     const pz = this.path[this.path.length > 1 ? 1 : 0][1];
     const door0 = pz - 1.3, door1 = pz + 1.3;
     if (door0 - WALL_Z > .2) gw(TW, (WALL_Z + door0) / 2, door0 - WALL_Z, Math.PI / 2);
     if (tool.z1 - door1 > .2) gw(TW, (door1 + tool.z1) / 2, tool.z1 - door1, Math.PI / 2);
-    gw(TW / 2, tool.z1, TW, 0);
     // Schriftzug am Boden + Wandschild
     const label = this.t('room.area').toUpperCase();
     const floorTxt = canvasTex(1024, 128, (g, cw, ch) => { g.fillStyle = 'rgba(240,230,0,.9)'; g.font = '700 84px "T-Star", Helvetica, Arial'; g.textBaseline = 'middle'; g.fillText(label, 10, ch / 2 + 4); });
@@ -553,7 +557,7 @@ export class Hall {
   updateLabels() {
     if (!this.labelsOn || !this.labels.length) return;
     const w = this.el.clientWidth, h = this.el.clientHeight;
-    const v = new THREE.Vector3();
+    const v = this._lv || (this._lv = new THREE.Vector3());
     const camPos = this.camera.position;
     for (const l of this.labels) {
       v.copy(l.pos).project(this.camera);
@@ -722,7 +726,7 @@ export class Hall {
     if (this.flowOn && this.route && this.pulses && !document.hidden) {
       const after = this.mode === 'after';
       const n = this.pulses.count, L = this.route.L, speed = after ? 2.4 : .8;
-      const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+      const mtx = this._m4 || (this._m4 = new THREE.Matrix4()), q = this._q || (this._q = new THREE.Quaternion()), sc = this._sc || (this._sc = new THREE.Vector3()), pos = this._pos || (this._pos = new THREE.Vector3()), p1 = this._p1 || (this._p1 = new THREE.Vector3());
       const visible = after ? n : Math.ceil(n / 3);
       for (let i = 0; i < n; i++) {
         let s = ((t * speed + i * L / n) % L + L) % L;
@@ -731,7 +735,7 @@ export class Hall {
         const x = seg.x0 + (seg.x1 - seg.x0) * k, z = seg.z0 + (seg.z1 - seg.z0) * k;
         const on = i < visible ? 1 : 0;
         sc.setScalar(on ? (after ? 1 : .8) : .0001);
-        mtx.compose(new THREE.Vector3(x, .16 + Math.sin(t * 4 + i) * .02, z), q, sc);
+        mtx.compose(pos.set(x, .16 + Math.sin(t * 4 + i) * .02, z), q, sc);
         this.pulses.setMatrixAt(i, mtx);
       }
       this.pulses.instanceMatrix.needsUpdate = true;
@@ -741,11 +745,11 @@ export class Hall {
           const a = this.arcs[i % this.arcs.length];
           const k = ((t * .35 + i / pn) % 1);
           const p0 = a.pre.position, z = a.m.userData.zidObj, m = a.m;
-          const p1 = new THREE.Vector3().setFromMatrixPosition(z.matrixWorld);
+          p1.setFromMatrixPosition(z.matrixWorld);
           const x = p0.x + (p1.x - p0.x) * k, zz = p0.z + (p1.z - p0.z) * k;
           const y = 2.2 + Math.sin(k * Math.PI) * (3 + p0.distanceTo(p1) * .08) * (1 - (k > .97 ? 1 : 0));
           sc.setScalar(after ? 1 : .0001);
-          mtx.compose(new THREE.Vector3(x, y * (1 - Math.pow(k, 12)) + 1.45 * Math.pow(k, 12), zz), q, sc);
+          mtx.compose(pos.set(x, y * (1 - Math.pow(k, 12)) + 1.45 * Math.pow(k, 12), zz), q, sc);
           this.packets.setMatrixAt(i, mtx);
         }
         this.packets.instanceMatrix.needsUpdate = true;

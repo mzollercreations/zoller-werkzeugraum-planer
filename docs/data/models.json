@@ -283,5 +283,25 @@
    "yellow",
    "zinc"
   ]
+ },
+ "zidcode_lo": {
+  "id": "zidcode_lo",
+  "file": "models/zidcode_lo.glb",
+  "screen": "models/tex/screen_zid_scan.webp",
+  "size": [
+   0.402,
+   1.422,
+   0.489
+  ],
+  "tris": 1030,
+  "classes": [
+   "blackoxide",
+   "blackplastic",
+   "darkgrey",
+   "paper",
+   "screen",
+   "whitealu",
+   "yellow"
+  ]
  }
 }

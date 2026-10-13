@@ -36,9 +36,12 @@ DEVICES = {
     "redomatic600":   ("XXXXXXX_752865_ZOLLER »redomatic 600«.glb", "screen_pilot4_measure.png", 90000),
     "powershrink400": ("XXXXXXX_752398_ZOLLER »powerShrink 400«.glb", "screen_pilot4_contour.png", 52000),
     "toolbalancer":   ("XXXXXXX_720749_ZOLLER »toolBalancer«.glb", "screen_pilot4_contour.png", 80000),
+    # leichte Fassung für die Stationen an jeder Maschine (bis zu 60 Stück in einer Halle)
+    "zidcode_lo":     ("XXXXXXX_717076_ZOLLER »zidCode«.glb", "screen_zid_scan.png", 5000),
 }
 # zidCode: Display teilt sich das Material mit dem Gehäuse -> nur große, nach vorn oben zeigende Flächen sind Bildschirm
 SCREEN_FACES = {"zidcode": dict(mat="plastik-schwarz", normal=(0, .41, .91), ymin=.8)}
+SCREEN_FACES["zidcode_lo"] = SCREEN_FACES["zidcode"]
 
 _REF = [
     ((0.0346, 0.0386, 0.0409), "darkgrey"), ((0.3985, 0.4005, 0.3943), "whitealu"), ((0.9529, 0.8941, 0.0), "yellow"),
@@ -202,12 +205,12 @@ def screen_uv(v, f):
     return np.c_[(u - u0) / max(u1 - u0, 1e-9), (w - w0) / max(w1 - w0, 1e-9)]
 
 
-def simplify(v, f, target):
+def simplify(v, f, target, border=True):
     if len(f) <= target:
         return v, f
     s = pyfqmr.Simplify()
     s.setMesh(v.astype(np.float64), f.astype(np.int32))
-    s.simplify_mesh(target_count=int(target), aggressiveness=6, preserve_border=True, verbose=0)
+    s.simplify_mesh(target_count=int(target), aggressiveness=6 if border else 8, preserve_border=border, verbose=0)
     nv, nf, _ = s.getMesh()
     return np.asarray(nv, dtype=np.float64), np.asarray(nf, dtype=np.int64)
 
@@ -242,9 +245,10 @@ def build(dev):
     for c, lst in sorted(groups.items(), key=lambda kv: -sum(len(f) for _, f in kv[1])):
         offs = np.cumsum([0] + [len(p) for p, _ in lst])
         v = np.vstack([p for p, _ in lst]); f = np.vstack([fc + o for (_, fc), o in zip(lst, offs)])
-        v, f = weld(v, f)
-        tgt = max(400, budget * len(f) / max(tri_total, 1)) if tri_total > budget else len(f)
-        v, f = simplify(v, f, tgt)
+        lo = dev.endswith('_lo')
+        v, f = weld(v, f, eps=.0025 if lo else 5e-5)    # leichte Fassung: Punkte auf 2,5-mm-Raster zusammenlegen
+        tgt = max(60 if lo else 400, budget * len(f) / max(tri_total, 1)) if tri_total > budget else len(f)
+        v, f = simplify(v, f, tgt, border=not lo)
         v, f = weld(v, f)
         pv, pn, pf = creased(v, f)
         prims.append(dict(cls=c, pos=pv, nrm=pn, idx=pf))
@@ -331,7 +335,7 @@ def textures():
         im.save(os.path.join(OUT, "tex", os.path.splitext(f)[0] + ".webp"), quality=86, method=6)
     rd = os.path.join(ROOT, "docs", "img", "render"); os.makedirs(rd, exist_ok=True)
     for dev in DEVICES:
-        src = os.path.join(CAD, "previews", dev + ".jpg")
+        src = os.path.join(CAD, "previews", dev.replace("_lo", "") + ".jpg")
         if os.path.exists(src):
             im = Image.open(src).convert("RGB"); im.thumbnail((960, 960), Image.LANCZOS)
             im.save(os.path.join(rd, dev + ".webp"), quality=82, method=6)

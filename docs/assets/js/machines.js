@@ -2,6 +2,7 @@
 // Bedienseite zeigt nach +Z. Jede Maschine hat eine Signalsäule (userData.andon) und einen Steuerungsbildschirm
 // (userData.screen), die der Planer je nach Ansicht (heute / mit ZOLLER) umschaltet.
 import * as THREE from 'three';
+import { mergeGeometries } from '../vendor/BufferGeometryUtils.js';
 
 const M = {};
 function mats() {
@@ -101,7 +102,7 @@ function andon(parent, x, y, z) {
   const segs = [];
   [M.red, M.amber, M.green].forEach((_, i) => {
     const s = mesh(new THREE.CylinderGeometry(.045, .045, .07, 16), M.andonOff, 0, .52 - i * .075, 0, g);
-    s.castShadow = false; segs.push(s);
+    s.castShadow = false; s.userData.keep = true; segs.push(s);
   });
   mesh(new THREE.CylinderGeometry(.03, .045, .03, 16), M.dark, 0, .58, 0, g);
   return segs;     // [rot, gelb, grün]
@@ -113,7 +114,7 @@ function panel(parent, x, y, z, rotY, ctrlName, lang) {
   const body = mesh(box(.56, .7, .1), M.dark, 0, .2, 0, g);
   body.rotation.x = -.12;
   const scr = new THREE.Mesh(new THREE.PlaneGeometry(.42, .315), new THREE.MeshBasicMaterial({ map: screenTexture(ctrlName, 'before', lang), toneMapped: false }));
-  scr.position.set(0, .3, .052); scr.rotation.x = -.12; g.add(scr);
+  scr.position.set(0, .3, .052); scr.rotation.x = -.12; scr.userData.keep = true; g.add(scr);
   mesh(box(.46, .18, .02), M.base, 0, -.02, .058, g).rotation.x = -.12;
   return scr;
 }
@@ -144,7 +145,7 @@ export function buildMachine(type, opt = {}) {
   let W, H, D, scr, segs;
   const plate = (y, z, w = 1.0) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 8), new THREE.MeshStandardMaterial({ map: plateTexture(opt.label || ''), roughness: .5 }));
-    m.position.set(0, y, z + .004); g.add(m);
+    m.position.set(0, y, z + .004); m.userData.keep = true; g.add(m);
   };
   switch (type) {
     case '5ax': {
@@ -235,6 +236,36 @@ export function buildMachine(type, opt = {}) {
     }
   }
   g.userData = { type, andon: segs, screen: scr, ctl, lang, W, H, D };
+  return mergeByMaterial(g);
+}
+
+// alle festen Teile einer Maschine je Material zu einem Mesh zusammenfassen (wenige Draw-Calls bei vielen Maschinen)
+function mergeByMaterial(g) {
+  g.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
+  const groups = new Map(), drop = [];
+  g.traverse((o) => {
+    if (!o.isMesh || o.userData.keep) return;
+    const geo = o.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+    const ng = geo.index ? geo.toNonIndexed() : geo;
+    for (const k of Object.keys(ng.attributes)) if (!['position', 'normal', 'uv'].includes(k)) ng.deleteAttribute(k);
+    if (!ng.attributes.uv) ng.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(ng.attributes.position.count * 2), 2));
+    if (!groups.has(o.material)) groups.set(o.material, []);
+    groups.get(o.material).push(ng);
+    drop.push(o);
+  });
+  const keep = [];
+  g.traverse((o) => { if (o.isMesh && o.userData.keep) keep.push(o); });
+  for (const o of drop) o.removeFromParent();
+  // leere Hilfsgruppen entfernen, behaltene Teile direkt unter die Maschine hängen
+  for (const o of keep) { const wm = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld); o.removeFromParent(); wm.decompose(o.position, o.quaternion, o.scale); g.add(o); }
+  for (const c of [...g.children]) if (!c.isMesh) g.remove(c);
+  for (const [mat, list] of groups) {
+    const m = new THREE.Mesh(mergeGeometries(list, false), mat);
+    m.castShadow = mat !== M.glass; m.receiveShadow = true;
+    if (mat === M.glass) m.renderOrder = 2;
+    g.add(m);
+  }
   return g;
 }
 
