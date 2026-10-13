@@ -3,6 +3,7 @@ import { STR } from './strings.js';
 import { BRANDS, CONTROLS, MTYPES, PRODUCTS, STEPS, FACTS, SITE, SHOWROOM, INDUSTRIES, brandByName, NEUTRAL_ACCENT } from './knowledge.js';
 import { defaultProfile, newMachine, recommend, gains, stats, pack, unpack, TIERS } from './engine.js';
 import { parse, apply, missing } from './nlu.js';
+import { answer, isQuestion, suggestions } from './expert.js';
 
 const CFG = Object.assign({ lang: 'de', base: '', langs: ['de', 'en'], locales: { de: '', en: 'en/' }, siteUrl: SITE + '/', showroom: SHOWROOM,
   mail: 'info@zoller.info', company: 'E. Zoller GmbH & Co. KG', expert: SITE + '/unternehmen/kontakt/ansprechpartner/', links: {}, factLinks: {} }, window.PLANER || {});
@@ -16,10 +17,20 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ------------------------------------------------------------------ Texte + Zahlen
+// Pluralformen: {n|eins|viele}, slawisch {n|eins|wenige|viele}, slowenisch {n|eins|zwei|wenige|viele}
+let PR;
+function plural(n, f) {
+  if (f.length === 2) return n === 1 ? f[0] : f[1];
+  const c = (PR ||= new Intl.PluralRules(LOC)).select(n);
+  if (c === 'one') return f[0];
+  if (c === 'two') return f[1];
+  if (c === 'few') return f[f.length - 2];
+  return f[f.length - 1];
+}
 export function t(key, p = {}) {
   let s = STR[LANG]?.[key] ?? STR.en?.[key] ?? STR.de[key] ?? key;
   if (CUR !== 'EUR' && !key.startsWith('fact.') && key !== 'gain.calc15k') s = s.replace(/€/g, SYM);
-  s = s.replace(/\{(\w+)\|([^|}]*)\|([^}]*)\}/g, (m, k, a, b) => (+p[k] === 1 ? a : b));
+  s = s.replace(/\{(\w+)((?:\|[^|}]*){2,4})\}/g, (m, k, f) => plural(+p[k], f.slice(1).split('|')));
   return s.replace(/\{(\w+)\}/g, (m, k) => (p[k] !== undefined ? (typeof p[k] === 'number' ? fmt(p[k]) : p[k]) : m));
 }
 const LOC = CFG.locale || (LANG === 'de' ? 'de-DE' : LANG);
@@ -81,6 +92,7 @@ async function init() {
     if (e.target.closest('[data-tour]')) toggleTour();
   });
   $('[data-ticker]').addEventListener('click', () => go('gain'));
+  $('[data-names]')?.addEventListener('click', () => setNames(S.hall ? !S.hall.labelsOn : false));
   // 3D-Halle (lazy, damit die Seite sofort steht)
   const models = await fetch(BASE + 'data/models.json').then((r) => r.json()).catch(() => ({}));
   const aspects = await fetch(BASE + 'data/aspects.json').then((r) => r.json()).catch(() => ({}));
@@ -90,7 +102,8 @@ async function init() {
     S.hall = new Hall($('[data-stage]'), {
       base: BASE, models, aspects, t, logo,
       onPick: onPick, onProgress: (k) => { $('[data-progress]').style.width = (k * 100) + '%'; if (k >= 1) setTimeout(() => $('[data-loader]').classList.add('is-done'), 300); },
-      onTourEnd: () => { $('[data-tour] span').textContent = t('room.tour'); },
+      onTourEnd: () => tourLabel(false),
+      onPlan: () => { if (S.step === 'room') prepareAR(); },
     });
     S.hall.setPlan({ devices: [], machines: [], software: [], lang: LANG }).then(() => {
       S.hall.view('overview'); $('[data-loader]').classList.add('is-done');
@@ -106,7 +119,8 @@ async function init() {
     try {
       const o = await decodeState(h[1]);
       S.profile = unpack(o, FX); S.profile.fx = FX; S.first = false;
-      recompute(); startChat(true); go('solution');
+      recompute(); startChat(true);
+      if (/[#&]ar=1/.test(location.hash)) { go('room'); setTimeout(arHandoff, 600); } else go('solution');
     } catch (e) { console.warn('Link konnte nicht gelesen werden', e); }
   }
   render();
@@ -114,11 +128,11 @@ async function init() {
 
 async function logoTexture() {
   const THREE = await import('three');
-  const img = new Image(); img.src = BASE + 'assets/img/zoller.svg';
+  const img = new Image(); img.src = BASE + 'assets/img/zoller-dark.svg';
   await img.decode().catch(() => {});
-  const c = document.createElement('canvas'); c.width = 1024; c.height = 234;
-  const g = c.getContext('2d'); g.drawImage(img, 0, 0, 1024, 234);
-  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const c = document.createElement('canvas'); c.width = 2048; c.height = 468;
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0, 2048, 468);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 16;
   return tex;
 }
 
@@ -150,6 +164,10 @@ function hitChips(r) {
     else if (h.kind === 'goal') s = t('goal.' + h.label);
     else if (h.kind === 'tier') s = t('tier.' + h.label);
     else if (h.kind === 'exclude' || h.kind === 'include') s = t('hit.' + h.kind, { v: t('prod.' + h.label) });
+    else if (h.kind === 'network') s = t('hit.net.' + h.label);
+    else if (h.kind === 'maxlen') s = t('hit.maxlen', { v: h.label });
+    else if (h.kind === 'maxdia') s = t('hit.maxdia', { v: h.label });
+    else if (['inserts', 'erp', 'gauges'].includes(h.kind)) s = t('hit.' + h.kind);
     if (s) out.push(`<span class="chip${h.kind === 'pain' ? '' : ' chip--y'}">${esc(s)}</span>`);
   }
   return out;
@@ -174,6 +192,14 @@ function say(who, html, extra = {}) { S.chat.push({ who, html, ...extra }); if (
 function handleText(text) {
   const r = parse(text);
   const p = S.profile;
+  if (isQuestion(text)) {
+    // Angaben in der Frage übernehmen (aber »ohne …« / »mit …« sind hier Teil der Frage, kein Änderungswunsch)
+    const info = { ...r, include: [], exclude: [], hits: r.hits.filter((h) => h.kind !== 'include' && h.kind !== 'exclude') };
+    if (info.machines.length || Object.keys(info.patch).length) { apply(p, info, newMachine, S.first && !p.machines.length); S.first = false; recompute(); }
+    const a = p.machines.length ? answer(text, qaCtx()) : null;
+    if (a) { say('bot', a.html + qaChips(a.chips)); return; }
+    if (!p.machines.length && !info.machines.length) { say('bot', esc(t('qa.first')), { replies: replyFor('machines') }); return; }
+  }
   const before = p.machines.reduce((a, m) => a + m.count, 0);
   apply(p, r, newMachine, S.first && !p.machines.length);
   S.first = false;
@@ -214,6 +240,8 @@ function replyFor(k) {
     case 'shrink': return [set('shrink', true, t('chip.yes')), set('shrink', false, t('chip.no')), def('shrink')];
     case 'hsc': return [set('hsc', true, t('chip.yes')), set('hsc', false, t('chip.no')), def('hsc')];
     case 'rate': return [65, 85, 110, 140].map((v) => nice(v)).map((v) => set('rate', v, t('chip.rate', { v }))).concat(def('rate'));
+    case 'network': return [set('network', 'yes', t('chip.net.yes')), set('network', 'no', t('chip.net.no')), def('network')];
+    case 'toolsize': return [300, 450, 600, 800, 1200].map((v) => set('maxLen', v, t('chip.len', { v }))).concat(def('maxLen'));
   }
   return [];
 }
@@ -236,6 +264,22 @@ function finishChat() {
   const g = S.gain;
   say('bot', `${esc(t('a.done', { items: S.items.reduce((a, i) => a + (PRODUCTS[i.id].virtual ? 0 : 1), 0), hours: fmt(g?.spindle || 0), eur: eur(g?.eur || 0) }))}
     <div class="btnrow" style="margin-top:.7rem"><button class="btn btn--yellow btn--sm" data-act="go:solution">${esc(t('a.cta.solution'))}</button><button class="btn btn--sm" data-act="go:gain">${esc(t('a.cta.gain'))}</button></div>`);
+  say('bot', `<span class="msg__q">${esc(t('qa.ask'))}</span>` + qaChips(suggestions(S.items, t).map((q) => [q, 'ask:' + q])));
+}
+function qaCtx() { return { p: S.profile, items: S.items, gain: S.gain, t, esc, eur, fmt, tierName: (x) => t('tier.' + x) }; }
+function qaChips(chips) {
+  if (!chips || !chips.length) return '';
+  return `<div class="replies qa-chips">${chips.map(([l, a]) => `<button type="button" data-qa="${esc(a)}">${esc(l)}</button>`).join('')}</div>`;
+}
+function onQA(a) {
+  const [k, ...rest] = a.split(':'); const v = rest.join(':');
+  if (k === 'go') go(v);
+  else if (k === 'mail') mail();
+  else if (k === 'ask') { say('you', esc(v)); handleText(v); }
+  else if (k === 'showroom') window.open(showroomUrl(v), '_blank', 'noopener');
+  else if (k === 'tier') { S.profile.tier = v; know('tier'); recompute(); say('bot', esc(t('qa.tierset', { tier: t('tier.' + v) }))); }
+  else if (k === 'restore') { S.profile.exclude = S.profile.exclude.filter((x) => x !== v); recompute(); say('bot', esc(t('a.updated'))); }
+  else if (k === 'include') { if (!S.profile.include.includes(v)) S.profile.include.push(v); S.profile.exclude = S.profile.exclude.filter((x) => x !== v); recompute(); say('bot', esc(t('qa.included', { name: t('prod.' + v) }))); }
 }
 
 // ------------------------------------------------------------------ Rechnen + Halle
@@ -253,7 +297,8 @@ function schedulePlan(p, items) {
   clearTimeout(planTimer);
   planTimer = setTimeout(() => S.hall && S.hall.setPlan(planFor(p, items)), 60);
 }
-const VISUAL_CAP = { keeper: 4, toolorganizer: 2, toolstation: 2, toolcart: 3, smile: 3, venturion: 3, venturion600: 3, venturion800: 3, hyperion: 3 };
+// so viele Geräte je Typ stehen höchstens im 3D-Raum (Beschriftung und Angebot nennen immer die geplante Menge)
+const VISUAL_CAP = { keeper: 6, toolorganizer: 4, toolstation: 4, toolcart: 5, smile: 4, venturion: 4, venturion600: 4, venturion800: 4, hyperion: 4 };
 function stepNo(items = S.items) {
   const present = STEPS.filter((st) => items.some((i) => i.step === st));
   return Object.fromEntries(present.map((st, i) => [st, i + 1]));
@@ -272,13 +317,14 @@ function planFor(p, items) {
   let total = 0, order = 0;
   for (const m of p.machines) {
     const b = brandByName(m.brand);
-    const zid = has('zidcode40') && CONTROLS[m.control]?.dmi ? 'zidcode40' : (has('zidcode') || has('zidcode40') ? 'zidcode' : null);
+    const z40 = has('zidcode40') && CONTROLS[m.control]?.dmi && S.profile.network !== 'no';
+    const zid = z40 ? 'zidcode40' : (has('zidcode') ? 'zidcode' : (has('zidcode40') ? 'zidcode40' : null));
     for (let i = 0; i < m.count && total < 60; i++, total++) {
-      machines.push({ key: m.id + '#' + i, group: m.id, order: order++, type: m.type, accent: b?.accent || NEUTRAL_ACCENT,
+      machines.push({ key: m.id + '#' + i, group: m.id, order: order++, type: m.type, accent: b?.accent || NEUTRAL_ACCENT, brandId: b?.id || '', brand: b?.name || m.brand, model: m.model,
         controlName: CONTROLS[m.control]?.name || '', label: [m.brand, m.model].filter(Boolean).join(' '), zid, custom: S.cad.get(m.id) || null });
     }
   }
-  return { devices, machines, software, lang: LANG, stepNo: stepNo(items) };
+  return { devices, machines, software, lang: LANG, stepNo: stepNo(items), tools: stats(p).tools, qty: Object.fromEntries(items.map((i) => [i.id, i.qty])) };
 }
 
 function setMode(mode) {
@@ -289,26 +335,42 @@ function setMode(mode) {
   if (mode === 'before') { cap.hidden = false; cap.innerHTML = `<b>${esc(t('room.before'))}</b>${esc(t('room.beforecap'))}`; }
   else { cap.hidden = false; cap.innerHTML = `<b>${esc(t('room.after'))}</b>${esc(t('room.aftercap'))}`; clearTimeout(S.capT); S.capT = setTimeout(() => { if (!S.touring) cap.hidden = true; }, 4200); }
 }
+// alle Rundgang-Knöpfe (HUD und Seitenleiste) zeigen denselben Zustand
+function tourLabel(on) {
+  $$('[data-tour] span, [data-act=tour]').forEach((el) => { el.textContent = t(on ? 'room.stop' : 'room.tour'); });
+}
 function toggleTour() {
   const h = S.hall; if (!h) return;
-  if (h.tourTimer) { h.stopTour(); S.touring = false; $('[data-caption]').hidden = true; return; }
+  if (h.tourTimer) { h.stopTour(); S.touring = false; $('[data-caption]').hidden = true; tourLabel(false); return; }
   if (S.mode !== 'after') setMode('after');
   S.touring = true;
-  $('[data-tour] span').textContent = t('room.stop');
+  tourLabel(true);
   const cap = $('[data-caption]');
   h.tour((s) => {
-    if (!s) { S.touring = false; cap.hidden = true; $('[data-tour] span').textContent = t('room.tour'); return; }
+    if (!s) { S.touring = false; cap.hidden = true; tourLabel(false); return; }
     cap.hidden = false;
     if (s.step) {
       const its = S.items.filter((i) => i.step === s.step && !PRODUCTS[i.id].soft);
       cap.innerHTML = `<b>${stepNo()[s.step]} · ${esc(t('step.' + s.step))}</b>${esc(t('stepd.' + s.step))} ${its.map((i) => esc(t('prod.' + i.id))).join(' · ')}`;
+    } else if (s.zid) {
+      const z40 = S.items.some((i) => i.id === 'zidcode40');
+      cap.innerHTML = `<b>${stepNo().identify || ''} · ${esc(t('step.identify'))}</b>${esc(t(z40 ? 'tour.zid40' : 'tour.zid'))}`;
     } else if (s.hall) {
-      cap.innerHTML = `<b>${stepNo().identify || ''} · ${esc(t('step.identify'))}</b>${esc(t('stepd.identify'))}`;
+      cap.innerHTML = `<b>${esc(t('room.v.hall'))}</b>${esc(t('tour.hall', { n: S.profile.machines.reduce((a, m) => a + m.count, 0) }))}`;
+    } else if (s.soft) {
+      cap.innerHTML = `<b>${stepNo().software || ''} · ${esc(t('step.software'))}</b>${esc(t('tour.soft'))} ${S.items.filter((i) => PRODUCTS[i.id].soft).map((i) => esc(t('prod.' + i.id))).join(' · ')}`;
     } else cap.innerHTML = `<b>ZOLLER</b>${esc(t('tour.done'))}`;
   });
 }
 
 function onPick(hit) {
+  if (hit.kind === 'zid') {
+    const i = S.hall.zids.findIndex((m) => m.userData.info.key === hit.machine); S.hall.focusZid(Math.max(0, i), true);
+    const cap = $('[data-caption]'); cap.hidden = false;
+    cap.innerHTML = `<b>${esc(t('prod.' + hit.pid))}</b>${esc(t(hit.pid === 'zidcode40' ? 'tour.zid40' : 'tour.zid'))}`;
+    clearTimeout(S.capT); S.capT = setTimeout(() => { if (!S.touring) cap.hidden = true; }, 7000);
+    return;
+  }
   if (hit.kind === 'machine') { S.hall.focusMachine(hit.key); const m = S.profile.machines.find((x) => x.id === hit.group); if (m && S.step === 'profile') editMachine(m); return; }
   if (hit.kind === 'station') { S.hall.focusStation(hit.step); if (S.step !== 'solution') go('solution', true); setTimeout(() => document.getElementById('st-' + hit.step)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80); return; }
   if (hit.kind === 'device') {
@@ -326,7 +388,7 @@ function go(step, keepCam) {
   app.dataset.step = step;
   render();
   if (!S.hall || keepCam) return;
-  if (step === 'room') { S.hall.view('toolroom'); }
+  if (step === 'room') { S.hall.view('toolroom'); prepareAR(); }
   else if (step === 'solution') S.hall.view('toolroom');
   else if (step === 'profile') S.hall.view(S.profile.machines.length ? 'overview' : 'overview');
 }
@@ -374,6 +436,7 @@ function renderPanel() {
   } else panel.scrollTop = S.lastStep === S.step ? st : 0;
   S.lastStep = S.step;
   bindPanel();
+  if (S.step === 'room') updateARButtons();
 }
 
 // ------------------------------------------------------------------ Panel: Fertigung
@@ -417,6 +480,7 @@ function img(pid) {
   if (pr.cad && CFG.renders !== false) return { src: `${BASE}img/render/${pr.cad}.webp`, render: true };
   return { src: `${BASE}img/p/${pr.img}.webp`, render: false };
 }
+function pname(it) { return it.model ? '»' + it.model + '«' : t('prod.' + it.id); }
 function prodUrl(pid) { const pr = PRODUCTS[pid]; return CFG.links[pid] || (LANG === 'de' ? SITE + pr.path + '/' : null); }
 function showroomUrl(pid) { return CFG.showroom + '#produkt/' + PRODUCTS[pid].showroom; }
 function factUrl(f) { return CFG.factLinks[f] || (LANG === 'de' ? SITE + FACTS[f].path + '/' : null); }
@@ -433,8 +497,9 @@ function panelSolution() {
     const pu = prodUrl(it.id);
     return `<article class="pcard${it.have ? ' is-have' : ''}" id="pc-${it.id}">
       <div class="pcard__img${im.render ? ' is-render' : ''}" style="background-image:url('${im.src}')"></div>
-      <div class="pcard__t"><h4>${esc(t('prod.' + it.id))}${it.qty > 1 || pr.perMachine ? `<span class="qty">${fmt(it.qty)}×</span>` : ''}${it.have ? `<span class="badge badge--g">${esc(t('sol.have'))}</span>` : ''}</h4>
+      <div class="pcard__t"><h4>${esc(pname(it))}${it.qty > 1 || pr.perMachine || pr.virtual ? `<span class="qty">${fmt(it.qty)}×</span>` : ''}${it.have ? `<span class="badge badge--g">${esc(t('sol.have'))}</span>` : ''}</h4>
         <p class="pcard__role">${esc(t('role.' + it.id))}${pr.perMachine ? ' · ' + esc(t('sol.permachine')) : ''}</p>
+        ${it.spec ? `<p class="pcard__spec">${it.spec.L ? `<span>L ≤ ${fmt(it.spec.L)} mm</span>` : ''}${it.spec.D ? `<span>Ø ≤ ${fmt(it.spec.D)} mm</span>` : ''}</p>` : ''}
         <div class="pcard__why">${it.why.map(([k, v]) => `<p>${esc(t(k, v))}</p>`).join('')}</div>
         ${f ? `<div class="pcard__fact">${esc(t('fact.' + f))} ${fu ? `<a href="${fu}" target="_blank" rel="noopener">${esc(t('src.' + f))}</a>` : `<span>${esc(t('src.' + f))}</span>`}</div>` : ''}
         <div class="pcard__links">${pu ? `<a href="${pu}" target="_blank" rel="noopener">${esc(t('sol.page'))}</a>` : ''}<a href="${showroomUrl(it.id)}" target="_blank" rel="noopener">${esc(t('sol.showroom'))}</a>${!pr.soft && !pr.virtual ? `<button type="button" data-fly="${pr.perMachine ? 'hall' : it.step}">${esc(t('sol.fly'))}</button>` : ''}</div>
@@ -457,19 +522,17 @@ function panelRoom() {
   const st = b ? b.stations : [];
   const area = b ? (b.tool.x1 - b.tool.x0) * (b.tool.z1 - b.tool.z0) : 0;
   const hallA = b ? (b.hall.x1 - b.hall.x0) * (b.hall.z1 - b.hall.z0) : 0;
-  const ar = document.createElement('a').relList?.supports?.('ar');
   return `<h2 class="p-h">${esc(t('room.h'))}</h2><p class="p-lead">${esc(t('room.lead'))}</p>
   <div class="facts3"><div><b>${fmt(area)} ${t('unit.m2')}</b><small>${esc(t('room.area'))}</small></div><div><b>${fmt(hallA)} ${t('unit.m2')}</b><small>${esc(t('room.hall'))}</small></div><div><b>${S.profile.machines.reduce((a, m) => a + m.count, 0)}</b><small>${esc(t('room.v.hall'))}</small></div></div>
   <div class="p-sec"><h3>${esc(t('room.stations'))}</h3><div class="stlist">${st.map((s) => `<button type="button" data-fly="${s.step}"><b>${stepNo()[s.step]}</b><span>${esc(t('step.' + s.step))}<small>${[...new Set(s.objs.map((o) => t('prod.' + o.userData.pid)))].join(' · ')}</small></span><span>→</span></button>`).join('')}
-    ${S.items.some((i) => PRODUCTS[i.id].perMachine) ? `<button type="button" data-fly="hall"><b>${stepNo().identify}</b><span>${esc(t('step.identify'))}<small>${S.items.filter((i) => PRODUCTS[i.id].perMachine).map((i) => t('prod.' + i.id)).join(' · ')}</small></span><span>→</span></button>` : ''}</div></div>
+    ${S.items.some((i) => PRODUCTS[i.id].perMachine) ? `<button type="button" data-fly="zid"><b>${stepNo().identify}</b><span>${esc(t('step.identify'))}<small>${S.items.filter((i) => PRODUCTS[i.id].perMachine).map((i) => t('prod.' + i.id)).join(' · ')}</small></span><span>→</span></button>` : ''}</div></div>
   <div class="p-sec"><h3>${esc(t('room.flow'))}</h3><div class="toggles">
     <div class="toggle"><span>${esc(t('room.flow'))}</span><button class="switch" role="switch" aria-checked="${S.hall?.flowOn !== false}" data-toggle="flow"></button></div>
     <div class="toggle"><span>${esc(t('room.labels'))}</span><button class="switch" role="switch" aria-checked="${S.hall?.labelsOn !== false}" data-toggle="labels"></button></div></div>
-    <p style="margin-top:.9rem" class="btnrow"><button class="btn btn--sm" data-act="tour">${esc(t('room.tour'))}</button><button class="btn btn--ghost btn--sm" data-act="mode:${S.mode === 'after' ? 'before' : 'after'}">${esc(t(S.mode === 'after' ? 'room.before' : 'room.after'))}</button></p></div>
-  <div class="p-sec"><h3>Export</h3><div class="btnrow">
-    ${ar ? `<button class="btn btn--sm" data-act="ar">${esc(t('room.ar'))}</button>` : ''}
-    <button class="btn btn--ghost btn--sm" data-act="png">${esc(t('room.png'))}</button><button class="btn btn--ghost btn--sm" data-act="glb">${esc(t('room.glb'))}</button></div>
-    <p class="note">${esc(t('room.arnote'))}</p></div>
+    <p style="margin-top:.9rem" class="btnrow"><button class="btn btn--sm" data-act="tour">${esc(t(S.touring ? 'room.stop' : 'room.tour'))}</button><button class="btn btn--ghost btn--sm" data-act="mode:${S.mode === 'after' ? 'before' : 'after'}">${esc(t(S.mode === 'after' ? 'room.before' : 'room.after'))}</button></p></div>
+  <div class="p-sec"><h3>${esc(t('ar.h'))}</h3>${arBlock()}</div>
+  <div class="p-sec"><h3>${esc(t('room.export'))}</h3><div class="btnrow">
+    <button class="btn btn--ghost btn--sm" data-act="png">${esc(t('room.png'))}</button><button class="btn btn--ghost btn--sm" data-act="glb">${esc(t('room.glb'))}</button></div></div>
   <p style="margin-top:1.4rem"><button class="btn btn--yellow btn--block" data-act="go:gain">${esc(t('s4'))} →</button></p>`;
 }
 
@@ -596,6 +659,11 @@ function panelOffer() {
 function bindPanel() {
   const root = $('[data-panel]');
   root.onclick = async (e) => {
+    const qa = e.target.closest('[data-qa]');
+    if (qa) { onQA(qa.dataset.qa); return; }
+    const arA = e.target.closest('[data-ar]');
+    if (arA && !arA.getAttribute('rel')) { e.preventDefault(); toast(t('ar.wait')); return; }
+    if (arA) return;
     const r = e.target.closest('[data-reply]');
     if (r) { const [mi, ri] = r.dataset.reply.split(':').map(Number); onReply(mi, ri); return; }
     const sum = e.target.closest('[data-sum] > summary');
@@ -611,9 +679,9 @@ function bindPanel() {
     const rs = e.target.closest('[data-restore]');
     if (rs) { const id = rs.dataset.restore; S.profile.exclude = S.profile.exclude.filter((x) => x !== id); recompute(); renderPanel(); return; }
     const fly = e.target.closest('[data-fly]');
-    if (fly) { const v = fly.dataset.fly; if (v === 'hall') S.hall?.view('hall'); else S.hall?.focusStation(v); return; }
+    if (fly) { const v = fly.dataset.fly; if (v === 'hall') S.hall?.view('hall'); else if (v === 'zid') S.hall?.focusZid(0, true); else S.hall?.focusStation(v); return; }
     const tg = e.target.closest('[data-toggle]');
-    if (tg) { const on = tg.getAttribute('aria-checked') !== 'true'; tg.setAttribute('aria-checked', on); if (tg.dataset.toggle === 'flow') S.hall?.setFlow(on); else S.hall?.setLabels(on); return; }
+    if (tg) { const on = tg.getAttribute('aria-checked') !== 'true'; tg.setAttribute('aria-checked', on); if (tg.dataset.toggle === 'flow') S.hall?.setFlow(on); else setNames(on); return; }
     const a = e.target.closest('[data-act]');
     if (!a) return;
     const act = a.dataset.act;
@@ -624,13 +692,9 @@ function bindPanel() {
     else if (act === 'editprod') editProduction();
     else if (act === 'tour') toggleTour();
     else if (act === 'png') { const url = S.hall.snapshot(2400, 1350); download(url, 'ZOLLER-Werkzeugraum.jpg'); }
-    else if (act === 'glb') { toast(t('room.export')); const b = await S.hall.exportGLB(); download(URL.createObjectURL(b), 'ZOLLER-Werkzeugraum.glb'); }
-    else if (act === 'ar') {
-      toast(t('room.export'));
-      const b = await S.hall.exportUSDZ();
-      const link = document.createElement('a'); link.rel = 'ar'; link.href = URL.createObjectURL(b); link.download = 'ZOLLER-Werkzeugraum.usdz';
-      link.appendChild(document.createElement('img')); link.click();
-    }
+    else if (act === 'glb') { toast(t('room.exporting')); const b = await S.hall.exportGLB(); download(URL.createObjectURL(b), 'ZOLLER-Werkzeugraum.glb'); }
+    else if (act === 'qr') openQR();
+    else if (act === 'xr') startXR();
     else if (act === 'share') { const u = await shareUrl(); try { await navigator.clipboard.writeText(u); toast(t('offer.copied')); } catch { prompt('', u); } }
     else if (act === 'mail') mail();
     else if (act === 'pdf') report();
@@ -775,28 +839,235 @@ async function mail() {
     `${t('gain.eur')}: ${eurExact(g.eur)} · ${t('gain.spindle')}: ${fmt(g.spindle)} h`, '', t('offer.mailoutro', { url })].filter((x) => x !== '');
   location.href = `mailto:${CFG.mail}?subject=${encodeURIComponent(t('offer.subject') + (p.company ? ' – ' + p.company : ''))}&body=${encodeURIComponent(lines.join('\n'))}`;
 }
+// ------------------------------------------------------------------ Konzept als PDF (Druckansicht mit Diagrammen)
+const PC = { y: '#f0e600', yd: '#c9bf00', ink: '#111214', g: '#8a9096', gl: '#d9dcdf', gx: '#eef0f1', red: '#e2552f', amber: '#f2a900', green: '#1f9d55' };
+const LEVER_COLORS = ['#f0e600', '#111214', '#6f767c', '#c9bf00', '#a7adb2', '#3d4246', '#e2552f'];
+// Diagramme für das PDF: in der Breite einer Spalte (≈ 85 mm) gezeichnet, damit die Schrift in Originalgröße druckt
+const CFK = new Intl.NumberFormat(LOC, { style: 'currency', currency: CUR, notation: 'compact', maximumFractionDigits: 1 });
+function svgLevers(levers) {
+  const W = 340, BW = 238, rh = 34, H = levers.length * rh + 2;
+  const max = Math.max(...levers.map((l) => l.eur), 1);
+  return `<svg viewBox="0 0 ${W} ${H}" class="r-chart" role="img">${levers.map((l, i) => {
+    const y = i * rh, w = BW * l.eur / max;
+    return `<text x="0" y="${y + 12}" class="t">${esc(t('lever.' + l.id))}</text>
+      <rect x="0" y="${y + 17}" width="${BW}" height="10" rx="2" fill="${PC.gx}"/><rect x="0" y="${y + 17}" width="${Math.max(3, w)}" height="10" rx="2" fill="${i ? PC.ink : PC.y}"/>
+      <text x="${W}" y="${y + 26}" text-anchor="end" class="v">${esc(eurExact(l.eur))}</text>`;
+  }).join('')}</svg>`;
+}
+function svgDonut(levers, total) {
+  const S0 = 230, cx = 110, cy = 110, r = 92, rin = 58;
+  let a0 = -Math.PI / 2;
+  const arcs = levers.map((l, i) => {
+    const a1 = a0 + (l.eur / total) * Math.PI * 2;
+    const big = a1 - a0 > Math.PI ? 1 : 0;
+    const P = (a, rr) => `${(cx + Math.cos(a) * rr).toFixed(2)} ${(cy + Math.sin(a) * rr).toFixed(2)}`;
+    const d = `M${P(a0, r)} A${r} ${r} 0 ${big} 1 ${P(a1, r)} L${P(a1, rin)} A${rin} ${rin} 0 ${big} 0 ${P(a0, rin)} Z`;
+    a0 = a1;
+    return `<path d="${d}" fill="${LEVER_COLORS[i % LEVER_COLORS.length]}" stroke="#fff" stroke-width="1.5"/>`;
+  }).join('');
+  const legend = levers.map((l, i) => `<div><span><i style="background:${LEVER_COLORS[i % LEVER_COLORS.length]}"></i>${esc(t('lever.' + l.id))}</span><b>${Math.round(l.eur / total * 100)} %</b></div>`).join('');
+  return `<div class="r-donut"><svg viewBox="0 0 ${S0 - 10} ${S0 - 10}" role="img">${arcs}<text x="${cx}" y="${cy - 4}" text-anchor="middle" class="v" style="font-size:15px">${esc(eurExact(total))}</text><text x="${cx}" y="${cy + 15}" text-anchor="middle" class="t">${esc(t('rep.peryear'))}</text></svg><div class="r-legend">${legend}</div></div>`;
+}
+function svgDowntime(before, after) {
+  const W = 340, L = 74, R = 58, max = Math.max(before, after, .1);
+  const bar = (y, v, c, label) => `<text x="0" y="${y + 20}" class="t">${esc(label)}</text><rect x="${L}" y="${y + 5}" width="${Math.max(3, (W - L - R) * v / max)}" height="22" rx="3" fill="${c}"/><text x="${L + (W - L - R) * v / max + 6}" y="${y + 20}" class="v">${esc(t('gain.minutes', { v: NF1.format(v) }))}</text>`;
+  const saved = Math.round((1 - after / before) * 100);
+  return `<svg viewBox="0 0 ${W} 66" class="r-chart" role="img">${bar(0, before, PC.red, t('gain.before'))}${bar(34, after, PC.y, t('gain.after'))}</svg><p class="r-big">${saved} % ${esc(t('rep.downtime.less'))}</p>`;
+}
+function svgShift(measB, entB, measA, entA, dayMin) {
+  const W = 340, L = 74, BW = W - L;
+  const row = (y, m, e, label) => {
+    const cut = dayMin - m - e, k = BW / dayMin;
+    return `<text x="0" y="${y + 20}" class="t">${esc(label)}</text>
+      <rect x="${L}" y="${y + 5}" width="${cut * k}" height="22" fill="${PC.gl}"/>
+      <rect x="${L + cut * k}" y="${y + 5}" width="${m * k}" height="22" fill="${PC.red}"/>
+      ${e > 0 ? `<rect x="${L + (cut + m) * k}" y="${y + 5}" width="${e * k}" height="22" fill="${PC.amber}"/>` : ''}
+      <text x="${L + 6}" y="${y + 20}" class="t" style="fill:#333">${esc(t('gain.minutes', { v: fmt(cut) }))}</text>`;
+  };
+  return `<svg viewBox="0 0 ${W} 66" class="r-chart" role="img">${row(0, measB, entB, t('gain.before'))}${row(34, measA, entA, t('gain.after'))}</svg>
+    <div class="r-key"><span style="--c:${PC.gl}">${esc(t('gain.cutting'))}</span><span style="--c:${PC.red}">${esc(t('gain.setupblk'))}</span><span style="--c:${PC.amber}">${esc(t('gain.entry'))}</span></div>`;
+}
+function svgCum(perYear, invest) {
+  const W = 340, H = 190, L = 62, B = 22, T = 18, R = 8, years = 5;
+  const maxV = Math.max(perYear * years, invest || 0) * 1.1 || 1;
+  const x = (i) => L + (W - L - R) * (i / years), y = (v) => T + (H - T - B) * (1 - v / maxV);
+  const pts = Array.from({ length: years * 12 + 1 }, (_, m) => [x(m / 12), y(perYear * m / 12)]);
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const ticks = [0, .25, .5, .75, 1].map((k) => maxV / 1.1 * k);
+  let inv = '';
+  if (invest) {
+    const yy = y(invest), m = invest / (perYear / 12);
+    inv = `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="${PC.red}" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${W - R}" y="${yy - 5}" text-anchor="end" class="t" style="fill:${PC.red}">${esc(t('gain.investline'))} ${esc(eurExact(invest))}</text>`;
+    if (m <= years * 12) inv += `<circle cx="${x(m / 12)}" cy="${yy}" r="4.5" fill="${PC.y}" stroke="#000" stroke-width="2"/><text x="${x(m / 12) + 8}" y="${yy + 16}" class="v">${esc(t('gain.payback'))}: ${esc(t('gain.months', { v: NF1.format(m) }))}</text>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" class="r-chart" role="img">
+    ${ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#e3e5e7"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" class="t">${esc(v ? CFK.format(v) : CF.format(0))}</text>`).join('')}
+    ${Array.from({ length: years }, (_, i) => `<text x="${x(i + 1)}" y="${H - 6}" text-anchor="${i === years - 1 ? 'end' : 'middle'}" class="t">${esc(t('gain.year', { v: i + 1 }))}</text>`).join('')}
+    <path d="${line} L${x(years)} ${y(0)} L${x(0)} ${y(0)} Z" fill="rgba(240,230,0,.35)"/><path d="${line}" fill="none" stroke="#111" stroke-width="2.2"/>
+    ${Array.from({ length: years }, (_, i) => `<circle cx="${x(i + 1)}" cy="${y(perYear * (i + 1))}" r="3" fill="#111"/>`).join('')}
+    <text x="${x(years)}" y="${y(perYear * years) - 8}" text-anchor="end" class="v">${esc(eurExact(perYear * years))}</text>${inv}</svg>`;
+}
+function svgCapacity(n, eq) {
+  // je Maschine ein Symbol, dahinter die gewonnene Kapazität in Gelb
+  const per = 12, sz = 38, gap = 8, total = n + Math.ceil(eq);
+  const rows = Math.ceil(Math.min(total, 48) / per);
+  const W = per * (sz + gap), H = rows * (sz + gap);
+  const icon = (i, fill, frac = 1) => {
+    const cx = (i % per) * (sz + gap), cy = Math.floor(i / per) * (sz + gap);
+    const shape = `<rect x="${cx + 4}" y="${cy + 8}" width="${sz - 8}" height="${sz - 10}" rx="3"/><rect x="${cx + 10}" y="${cy + 13}" width="${sz - 20}" height="${sz - 24}" rx="1" fill="#fff" opacity=".55"/>`;
+    if (frac >= 1) return `<g fill="${fill}">${shape}</g>`;
+    return `<clipPath id="cp${i}"><rect x="${cx}" y="${cy}" width="${sz * frac}" height="${sz}"/></clipPath><g fill="${PC.gl}">${shape}</g><g fill="${fill}" clip-path="url(#cp${i})">${shape}</g>`;
+  };
+  const items = [];
+  for (let i = 0; i < Math.min(n, 48); i++) items.push(icon(i, '#3a3f44'));
+  const whole = Math.floor(eq), frac = eq - whole;
+  for (let i = 0; i < whole && n + i < 48; i++) items.push(icon(n + i, PC.y));
+  if (frac > .02 && n + whole < 48) items.push(icon(n + whole, PC.y, frac));
+  return `<svg viewBox="0 0 ${W} ${H}" class="r-chart r-cap" role="img">${items.join('')}</svg>`;
+}
 function report() {
-  const p = S.profile, g = S.gain;
-  const shot = S.hall ? S.hall.snapshot(1800, 900) : '';
-  const date = new Date().toLocaleDateString(LANG === 'de' ? 'de-DE' : LANG);
-  $('[data-report]').innerHTML = `<div class="r-top"><img src="${BASE}assets/img/zoller.svg" alt="ZOLLER"><span class="r-small">${esc(t('rep.date', { v: date }))}</span></div>
-  <h1>${esc(t('rep.title'))}${p.company ? ' – ' + esc(p.company) : ''}</h1>
-  <div class="r-hero"><div><b>${eurExact(g.eur)}</b>${esc(t('gain.eur'))}</div><div><b>+${fmt(g.spindle)} h</b>${esc(t('gain.spindle'))}</div><div><b>${NF1.format(g.machinesEq)}</b>${esc(t('gain.machines'))}</div><div><b>${g.payback ? esc(t('gain.months', { v: NF1.format(g.payback) })) : eurExact(g.eur / p.days)}</b>${esc(g.payback ? t('gain.payback') : t('gain.wait'))}</div></div>
-  ${shot ? `<img class="shot" src="${shot}" alt="">` : ''}
-  <h2>${esc(t('rep.profile'))}</h2><table><tr><th>${esc(t('rep.qty'))}</th><th>${esc(t('f.brand'))} / ${esc(t('f.model'))}</th><th>${esc(t('f.type'))}</th><th>${esc(t('f.control'))}</th></tr>
-  ${p.machines.map((m) => `<tr><td>${m.count}</td><td>${esc([m.brand, m.model].filter(Boolean).join(' ') || '–')}</td><td>${esc(t('mt.' + m.type))}</td><td>${esc(CONTROLS[m.control]?.name || '–')}</td></tr>`).join('')}</table>
-  <p class="r-small">${esc(t('f.shifts'))}: ${p.shifts} · ${esc(t('f.changes'))}: ${p.changes} · ${esc(t('f.days'))}: ${p.days} · ${esc(t('f.rate'))}: ${p.rate} · ${esc(t('f.measure'))}: ${esc(t('meas.' + (p.measure || 'machine')))} · ${esc(t('f.data'))}: ${esc(t('data.' + (p.data || 'typed')))}</p>
-  <h2 class="r-break">${esc(t('rep.solution'))} – ${esc(t('tier.' + p.tier))}</h2><table><tr><th>${esc(t('rep.qty'))}</th><th>${esc(t('rep.product'))}</th><th>${esc(t('rep.step'))}</th><th>${esc(t('rep.reason'))}</th></tr>
-  ${S.items.map((i) => `<tr><td>${fmt(i.qty)}</td><td><b>${esc(t('prod.' + i.id))}</b><br><span class="r-small">${esc(t('role.' + i.id))}</span></td><td>${esc(t('step.' + i.step))}</td><td>${i.why.map(([k, v]) => esc(t(k, v))).join('<br>')}</td></tr>`).join('')}</table>
-  <h2>${esc(t('rep.gain'))}</h2><table><tr><th>${esc(t('gain.levers'))}</th><th>${esc(t('gain.formula'))}</th><th style="text-align:right">€</th></tr>
-  ${g.levers.map((l) => { const f = { ...l.f }; if (f.spend !== undefined) { f.spend = eur(f.spend); f.value = eur(f.value); } if (f.entries !== undefined) f.entries = fmt(f.entries); return `<tr><td>${esc(t('lever.' + l.id))}</td><td class="r-small">${esc(t('leverf.' + l.id, f))}</td><td style="text-align:right">${eurExact(l.eur)}</td></tr>`; }).join('')}
-  <tr><th>Σ</th><th></th><th style="text-align:right">${eurExact(g.eur)}</th></tr></table>
-  <h2>${esc(t('rep.assume'))}</h2><p class="r-small">${esc(t('gain.moded'))} (${esc(t('gain.mode.' + p.mode))})</p>
-  <ol class="r-small">${[...new Set(g.levers.flatMap((l) => l.facts))].map((f) => `<li>${esc(t('fact.' + f))} – ${esc(t('src.' + f))}${factUrl(f) ? ` (${factUrl(f)})` : ''}</li>`).join('')}</ol>
-  <p class="r-small">${esc(t('offer.note'))} ${esc(CFG.company)}</p>`;
-  const imgEl = $('[data-report] img.shot');
-  const go = () => setTimeout(() => window.print(), 100);
-  if (imgEl && !imgEl.complete) imgEl.onload = go; else go();
+  const p = S.profile, g = S.gain, st = g.stats;
+  const shot = S.hall ? S.hall.snapshot(2000, 1000, 'hall') : '';
+  const shotTool = S.hall ? S.hall.snapshot(2000, 1000, 'tool') : '';
+  const date = new Date().toLocaleDateString(LOC);
+  const dayMin = p.hours * 60, ch = p.changes;
+  const measB = (p.measure === 'zoller' ? 1.52 : 4.52) * ch, entB = (p.data === 'post' ? 0 : .75) * ch;
+  const pres = g.levers.find((l) => l.id === 'presetting'), dt = g.levers.find((l) => l.id === 'datatransfer');
+  const measA = Math.max(0, measB - (pres ? pres.f.min * ch : 0)), entA = Math.max(0, entB - (dt ? dt.f.sec / 60 * ch : 0));
+  const n = p.machines.reduce((a, m) => a + m.count, 0);
+  const perDay = g.eur / p.days;
+  const leverRows = g.levers.map((l) => { const f = { ...l.f }; if (f.spend !== undefined) { f.spend = eur(f.spend); f.value = eur(f.value); } if (f.entries !== undefined) f.entries = fmt(f.entries); return `<tr><td><b>${esc(t('lever.' + l.id))}</b><br><span class="r-small">${esc(t('leverd.' + l.id, f))}</span></td><td class="r-small">${esc(t('leverf.' + l.id, f))}</td><td class="num">${eurExact(l.eur)}</td></tr>`; }).join('');
+  const facts = [...new Set([...g.levers.flatMap((l) => l.facts), ...S.items.flatMap((i) => i.facts)])];
+  const tiles = (pairs) => `<div class="r-tiles">${pairs.map(([v, l], i) => `<div${i === 0 ? ' class="is-y"' : ''}><b>${v}</b>${esc(l)}</div>`).join('')}</div>`;
+  $('[data-report]').innerHTML = `
+  <section class="r-page r-cover">
+    <div class="r-top"><img src="${BASE}assets/img/zoller-dark.svg" alt="ZOLLER"><span class="r-small">${esc(t('rep.date', { v: date }))}</span></div>
+    <p class="r-kicker">${esc(t('ui.title'))}</p>
+    <h1>${esc(t('rep.title'))}${p.company ? '<br><span>' + esc(p.company) + '</span>' : ''}</h1>
+    <p class="r-lead">${esc(t('rep.lead', { n, tier: t('tier.' + p.tier), items: S.items.filter((i) => !PRODUCTS[i.id].virtual).length }))}</p>
+    ${tiles([[eurExact(g.eur), t('gain.eur')], ['+' + fmt(g.spindle) + ' h', t('gain.spindle')], [NF1.format(g.machinesEq), t('gain.machines')], [g.payback ? esc(t('gain.months', { v: NF1.format(g.payback) })) : eurExact(perDay), g.payback ? t('gain.payback') : t('gain.wait')]])}
+    ${shot ? `<img class="shot" src="${shot}" alt="">` : ''}
+    <p class="r-small">${esc(t('rep.coverNote'))}</p>
+  </section>
+  <section class="r-page">
+    <h2>${esc(t('rep.gain'))}</h2>
+    <div class="r-grid2"><div><h3>${esc(t('gain.levers'))}</h3>${svgLevers(g.levers)}</div><div><h3>${esc(t('rep.share'))}</h3>${svgDonut(g.levers, g.eur || 1)}</div></div>
+    <div class="r-grid2">
+      <div><h3>${esc(t('rep.downtime.h'))}</h3>${svgDowntime(g.setupBefore, g.setupAfter)}<p class="r-small">${esc(t('rep.downtime.note', { changes: ch }))}</p></div>
+      <div><h3>${esc(t('gain.day'))}</h3>${svgShift(measB, entB, measA, entA, dayMin)}<p class="r-small">${esc(t('gain.daynote', { changes: ch, before: fmt(measB + entB), after: fmt(measA + entA), gain: fmt(measB + entB - measA - entA) }))}</p></div>
+    </div>
+    <div class="r-grid2">
+      <div><h3>${esc(t('gain.cum'))}</h3>${svgCum(g.eur, p.invest)}</div>
+      <div><h3>${esc(t('rep.capacity'))}</h3>${svgCapacity(n, g.machinesEq)}<p class="r-small">${esc(t('rep.capacity.note', { n, eq: NF1.format(g.machinesEq), hours: fmt(g.spindle) }))}</p>
+        <h3 style="margin-top:5mm">${esc(t('rep.wait'))}</h3>${tiles([[eurExact(perDay), t('rep.perday')], [eurExact(perDay * p.days / 12), t('rep.permonth')], [eurExact(g.eur), t('rep.peryear')]])}</div>
+    </div>
+  </section>
+  <section class="r-page">
+    <h2>${esc(t('rep.solution'))} – ${esc(t('tier.' + p.tier))}</h2>
+    ${shotTool ? `<img class="shot shot--s" src="${shotTool}" alt="">` : ''}
+    <table class="r-prod"><tr><th></th><th>${esc(t('rep.product'))}</th><th>${esc(t('rep.qty'))}</th><th>${esc(t('rep.reason'))}</th></tr>
+    ${S.items.map((i) => { const im = img(i.id); return `<tr><td><img src="${im.src}" alt="" class="r-thumb${im.render ? ' is-render' : ''}"></td><td><b>${esc(pname(i))}</b><br><span class="r-small">${esc(t('step.' + i.step))} · ${esc(t('role.' + i.id))}</span>${i.spec ? `<br><span class="r-small">${i.spec.L ? 'L ≤ ' + fmt(i.spec.L) + ' mm' : ''}${i.spec.D ? ' · Ø ≤ ' + fmt(i.spec.D) + ' mm' : ''}</span>` : ''}</td><td class="num">${fmt(i.qty)}</td><td class="r-small">${i.why.map(([k, v]) => esc(t(k, v))).join('<br>')}</td></tr>`; }).join('')}</table>
+  </section>
+  <section class="r-page">
+    <h2>${esc(t('rep.profile'))}</h2>
+    <table><tr><th>${esc(t('rep.qty'))}</th><th>${esc(t('f.brand'))} / ${esc(t('f.model'))}</th><th>${esc(t('f.type'))}</th><th>${esc(t('f.control'))}</th><th>${esc(t('f.holder'))}</th></tr>
+    ${p.machines.map((m) => `<tr><td class="num">${m.count}</td><td>${esc([m.brand, m.model].filter(Boolean).join(' ') || '–')}</td><td>${esc(t('mt.' + m.type))}</td><td>${esc(CONTROLS[m.control]?.name || '–')}</td><td>${esc(m.holder || MTYPES[m.type].holder)}</td></tr>`).join('')}</table>
+    <p class="r-small">${esc(t('f.shifts'))}: ${p.shifts} · ${esc(t('f.changes'))}: ${p.changes} · ${esc(t('f.days'))}: ${p.days} · ${esc(t('f.hours'))}: ${p.hours} · ${esc(t('f.rate'))}: ${eurExact(p.rate)} · ${esc(t('f.staff'))}: ${eurExact(p.staff)} · ${esc(t('f.tools'))}: ${fmt(st.tools)} · ${esc(t('f.measure'))}: ${esc(t('meas.' + (p.measure || 'machine')))} · ${esc(t('f.data'))}: ${esc(t('data.' + (p.data || 'typed')))}</p>
+    <h2>${esc(t('rep.calc'))}</h2>
+    <table><tr><th>${esc(t('gain.levers'))}</th><th>${esc(t('gain.formula'))}</th><th class="num">${SYM}</th></tr>${leverRows}<tr><th>Σ</th><th></th><th class="num">${eurExact(g.eur)}</th></tr></table>
+    <p class="r-small">${esc(t('gain.moded'))} (${esc(t('gain.mode.' + p.mode))})</p>
+    <h2>${esc(t('rep.assume'))}</h2>
+    <ol class="r-small r-src">${facts.map((f) => `<li>${esc(t('fact.' + f))} – ${esc(t('src.' + f))}${factUrl(f) ? ` (${esc(factUrl(f))})` : ''}</li>`).join('')}</ol>
+    <p class="r-small">${esc(t('offer.note'))} ${esc(CFG.company)}</p>
+  </section>`;
+  const imgs = $$('[data-report] img');
+  Promise.all(imgs.map((im) => (im.complete ? 1 : new Promise((r) => { im.onload = im.onerror = r; setTimeout(r, 5000); })))).then(() => setTimeout(() => window.print(), 150));
+}
+
+// ------------------------------------------------------------------ AR: iPhone/iPad (AR Quick Look), Android (WebXR), sonst QR-Code
+const IOS_AR = (() => { try { return document.createElement('a').relList.supports('ar'); } catch { return false; } })();
+let XR_OK = false;
+try { navigator.xr?.isSessionSupported?.('immersive-ar').then((v) => { XR_OK = !!v; if (S.step === 'room') renderPanel(); }).catch(() => {}); } catch { /* kein WebXR */ }
+const AR_ICON = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linejoin="round"><path d="M12 2.8 20 7.4v9.2l-8 4.6-8-4.6V7.4z"/><path d="M4 7.4l8 4.6 8-4.6M12 12v9.2"/></svg>');
+function arBlock() {
+  if (IOS_AR) return `<div class="arbtns">
+      <a class="btn btn--yellow btn--sm arbtn is-wait" data-ar="room" href="#"><img src="${AR_ICON}" alt="" width="18" height="18"><span>${esc(t('ar.room'))}</span><i class="spin"></i></a>
+      <a class="btn btn--ghost btn--sm arbtn is-wait" data-ar="hall" href="#"><img src="${AR_ICON}" alt="" width="18" height="18"><span>${esc(t('ar.hall'))}</span><i class="spin"></i></a></div>
+    <p class="note" data-arnote>${esc(t('ar.wait'))}</p>`;
+  if (XR_OK) return `<div class="arbtns"><button class="btn btn--yellow btn--sm" data-act="xr"><img src="${AR_ICON}" alt="" width="18" height="18">${esc(t('ar.room'))}</button></div><p class="note">${esc(t('ar.note.xr'))}</p>`;
+  if (matchMedia('(pointer: coarse)').matches) return `<p class="note">${esc(t('ar.note.none'))}</p>`;
+  return `<div class="arbtns"><button class="btn btn--sm" data-act="qr"><img src="${AR_ICON}" alt="" width="18" height="18" style="filter:invert(1)">${esc(t('ar.qr'))}</button></div><p class="note">${esc(t('ar.note.qr'))}</p>`;
+}
+function prepareAR() {
+  if (!IOS_AR || !S.hall) return;
+  clearTimeout(S.arT);
+  S.arT = setTimeout(async () => {
+    if (!S.hall.bounds) return;
+    const key = S.hall.planKey();
+    if (S.ar?.key === key && (S.ar.room || S.ar.busy)) { updateARButtons(); return; }
+    if (S.ar) for (const k of ['room', 'hall']) if (S.ar[k]) URL.revokeObjectURL(S.ar[k]);
+    S.ar = { key, room: null, hall: null, busy: true };
+    updateARButtons();
+    try {
+      for (const kind of ['room', 'hall']) {
+        const blob = await S.hall.buildUSDZ(kind);
+        if (S.ar.key !== key) return;
+        S.ar[kind] = URL.createObjectURL(blob);
+        updateARButtons();
+      }
+    } catch (e) { console.error('AR', e); S.ar.err = true; }
+    S.ar.busy = false; updateARButtons();
+  }, 1100);
+}
+function arFragment(kind) {
+  const title = 'ZOLLER ' + t(kind === 'room' ? 'ar.room' : 'ar.hall');
+  const sub = `${eur(S.gain?.eur || 0)} ${t('gain.eur')}`;
+  return `#callToAction=${encodeURIComponent(t('offer.mail'))}&checkoutTitle=${encodeURIComponent(title)}&checkoutSubtitle=${encodeURIComponent(sub)}`;
+}
+function updateARButtons() {
+  $$('[data-ar]').forEach((a) => {
+    const url = S.ar?.[a.dataset.ar];
+    if (url) {
+      a.rel = 'ar'; a.href = url + arFragment(a.dataset.ar); a.classList.remove('is-wait');
+      if (!a.dataset.bound) { a.dataset.bound = '1'; a.addEventListener('message', (e) => { if (e.data === '_apple_ar_quicklook_button_tapped') mail(); }, false); }
+    } else { a.removeAttribute('rel'); a.setAttribute('href', '#'); a.classList.add('is-wait'); }
+  });
+  $$('[data-arnote]').forEach((n) => { n.textContent = S.ar?.err ? t('ar.err') : (S.ar?.room ? t('ar.note.ios') : t('ar.wait')); });
+}
+// Link vom QR-Code: auf dem Handy direkt das AR-Fenster anbieten (Quick Look braucht ein Antippen)
+function arHandoff() {
+  if (!IOS_AR && !XR_OK) return;
+  openSheet(`<div class="sheet__head"><h3>${esc(t('ar.h'))}</h3><button class="x" data-close aria-label="${esc(t('ui.close'))}">✕</button></div><p class="p-lead">${esc(t('ar.handoff'))}</p>${arBlock()}`, (el) => {
+    el.addEventListener('click', (e) => {
+      const a = e.target.closest('[data-ar]'); if (a && !a.getAttribute('rel')) { e.preventDefault(); toast(t('ar.wait')); }
+      if (e.target.closest('[data-act="xr"]')) { sheet.close(); startXR(); }
+    });
+    prepareAR(); updateARButtons();
+  });
+}
+let qrLib = null;
+function loadScript(src) {
+  return qrLib || (qrLib = new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }));
+}
+async function openQR() {
+  const url = (await shareUrl()) + '&ar=1';
+  try { await loadScript(BASE + 'assets/vendor/qrcode.min.js'); } catch { prompt('', url); return; }
+  const qr = window.qrcode(0, 'M'); qr.addData(url); qr.make();
+  openSheet(`<div class="sheet__head"><h3>${esc(t('ar.qr.h'))}</h3><button class="x" data-close aria-label="${esc(t('ui.close'))}">✕</button></div>
+    <div class="qr">${qr.createSvgTag({ cellSize: 5, margin: 3, scalable: true })}</div><p class="note" style="text-align:center">${esc(t('ar.qr.note'))}</p>
+    <p class="btnrow" style="justify-content:center;margin-top:.8rem"><button class="btn btn--ghost btn--sm" data-copy>${esc(t('offer.share'))}</button></p>`, (el) => {
+    $('[data-copy]', el)?.addEventListener('click', async () => { try { await navigator.clipboard.writeText(url); toast(t('offer.copied')); } catch { prompt('', url); } });
+  });
+}
+async function startXR() {
+  try { const m = await import('./xr.js'); await m.startXR(S.hall, { t, base: BASE }); }
+  catch (e) { console.error(e); toast(t('ar.err')); }
+}
+function setNames(on) {
+  S.hall?.setLabels(on);
+  const b = $('[data-names]');
+  if (b) { b.classList.toggle('is-on', !on); $('span', b).textContent = t(on ? 'room.hidenames' : 'room.shownames'); b.setAttribute('aria-pressed', String(!on)); }
+  $$('[data-toggle="labels"]').forEach((x) => x.setAttribute('aria-checked', String(on)));
 }
 
 function download(url, name) { const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }

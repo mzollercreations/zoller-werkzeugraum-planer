@@ -19,13 +19,18 @@ const NUMW = {
 };
 
 const TYPE_RE = [
-  ['turnmill', /dreh-?\s?fräs|fräs-?\s?dreh|turn-?\s?mill|mill-?\s?turn|multi-?task|komplettbearbeitung|b-achs|tour-?fraise|torno-?fresadora|multitarea/],
-  ['swiss', /langdreh|swiss[- ]?type|\bswiss\b|décolletage|decolletage|tornos?\s?suizos?|tornos?\s?de\s?cabezal\s?móvil|tours? à poupée mobile|sliding\s?head/],
-  ['5ax', /5[- ]?achs|fünf-?achs|5[- ]?axis|five[- ]axis|5\s?ejes|5\s?axes|simultan(fräs)?|5x\b/],
-  ['hmc', /horizontal(es|e|en)?\s?(bearbeitungs|fräs|baz|machining|mill)|\bhmc\b|horizontal(e|es)?\s?(zentr|center)|palettenwechsl|pallet\s?changer|centre\s?d.usinage\s?horizontal|centro\s?de\s?mecanizado\s?horizontal/],
-  ['grinder', /werkzeugschleif|schleifmaschine|grinder|grinding\s?machine|rectificadora|affûteuse|affuteuse|rectifieuse/],
-  ['lathe', /drehmaschine|drehbank|drehzentr|cnc-?dreh|\blathe|turning\s?cent|\btorno|\btour\b|\btours\b|drehautomat|vertikaldreh/],
-  ['vmc', /vertikal|\bvmc\b|fräsmaschine|fraesmaschine|fräszentr|bearbeitungszentr|\bbaz\b|milling|\bmill(s)?\b|machining\s?cent|fresadora|centro\s?de\s?mecanizado|fraiseuse|centre\s?d.usinage|\bcnc-?fräs/],
+  ['gear', /verzahn|wälzfräs|waelzfraes|wälzschleif|hobbing|gear\s?(cutting|hobbing|shaping|grinding|machine)|zahnrad(fräs|maschine)|taillage|tallado de engranajes|dentatrice|ozuben|uzębien|fogaskerék|zobnik|kugghjul|engrenagens|滚齿|ホブ盤|歯切り|기어\s?가공|зубофрез|dişli açma/],
+  ['multispindle', /mehrspindel|multi-?spindle|multibroche|multihusillo|plurimandrino|vícevřeten|wielowrzecion|többorsós|flerspindl|multifuso|多轴自动|多軸自動|다축\s?자동|многошпиндел|çok milli/],
+  ['gantry', /portal(fräs|maschine|bearbeitung|anlage)?\b|gantry|bridge(-type)?\s?mill|double[- ]column|doppelständer|fresadora de pórtico|portique|pórtico|fresatrice a portale|portálov|bramow|portálmar|portalni|portalfräs|门式|門形|문형|портальн|köprü tipi/],
+  ['boring', /bohrwerk|horizontal-?bohr|boring\s?mill|horizontal boring|aléseuse|mandrinadora|alesatrice|vyvrtávač|wytaczark|fúrómű|vrtalni|borrverk|mandriladora|镗床|中ぐり|보링|расточн|borwerk/],
+  ['vtl', /karussell(dreh)?|vertikaldreh|vertical\s?turning|\bvtl\b|vertical lathe|tour vertical|torno vertical|tornio verticale|karuzel|svislý soustruh|carrousel|立式车床|立旋盤|수직\s?선반|карусельн|dikey torna|vertikal\s?svarv|vertikaln\S*\s?stružnic|függőleges\s?eszterg|pionow\S*\s?tokar|vertikální\s?soustruh|zvisl\S*\s?sústruh|вертикально-?токарн/],
+  ['turnmill', /dreh-?\s?fräs|fräs-?\s?dreh|turn-?\s?mill|mill-?\s?turn|multi-?task|komplettbearbeitung|b-achs|tour-?fraise|torno-?fresadora|multitarea|车铣|複合加工|複合旋盤|복합\s?가공|токарно-?фрезерн|tokarsko-?frezar|frézo-?soustruž|soustružnicko-?frézovac|sústružnícko-?frézovac|esztergáló-?maró|svarv-?fräs|multitasking|multitarefa/],
+  ['swiss', /langdreh|swiss[- ]?type|\bswiss\b|décolletage|decolletage|tornos?\s?suizos?|tornos?\s?de\s?cabezal\s?móvil|tours? à poupée mobile|sliding\s?head|走心|スイス型|自動旋盤|주축\s?이동형|스위스\s?(타입|형)|продольн\S*\s?(точ|автомат)|автомат\S*\s?продольн|kayar\s?otomat|swiss\s?tipi|automat\S*\s?wzdłużn|posuvným\s?vřeteníkem|pozdĺžn\S*\s?sústruh|hosszesztergá|långsvarv|fantina\s?mobile|tipo\s?suíço|cabeçote\s?móvel/],
+  ['5ax', /5[- ]?achs|fünf-?achs|5[- ]?axis|five[- ]axis|5\s?ejes|5\s?axes|simultan(fräs)?|5x\b|5[- ]?(osi|osé|osov|osn|tengely|eksen|assi|eixos|axl|осев|координат)|пятиосев|五轴|5轴|5軸|5\s?축/],
+  ['hmc', /horizontal(es|e|en)?\s?(bearbeitungs|fräs|baz|machining|mill)|\bhmc\b|horizontal(e|es)?\s?(zentr|center)|palettenwechsl|pallet\s?changer|centre\s?d.usinage\s?horizontal|centro\s?de\s?mecanizado\s?horizontal|卧式加工|横[形型]マシニング|수평형?\s?머시닝|горизонтальн\S*\s?обрабатыв|yatay\s?işleme|centr[oi]\s?di\s?lavoro\s?orizzontal|centros?\s?de\s?usinagem\s?horizontal|horisontell|poziom\S*\s?centr|horizontální\s?(obráběcí|cent)|horizontáln\S*\s?(obrábac|cent)|vízszintes|horizontaln\S*\s?obdel/],
+  ['grinder', /werkzeugschleif|schleifmaschine|grinder|grinding\s?machine|rectificadora|affûteuse|affuteuse|rectifieuse|rettific|retific|slipmaskin|szlifierk|bruska|brúsk|brusiln|köszörű|磨床|研削盤|연삭기|шлифовальн|taşlama/],
+  ['lathe', /drehmaschine|drehbank|drehzentr|cnc-?dreh|\blathe|turning\s?cent|\btorno|\btour\b|\btours\b|drehautomat|tornio|torni\b|svarv|tokar|soustruh|sústruh|stružnic|eszterg|车床|车削中心|旋盤|ターニング\s?センタ|선반|터닝\s?센터|токарн|torna/],
+  ['vmc', /vertikal|\bvmc\b|fräsmaschine|fraesmaschine|fräszentr|bearbeitungszentr|\bbaz\b|milling|\bmill(s)?\b|machining\s?cent|fresadora|centro\s?de\s?mecanizado|fraiseuse|centre\s?d.usinage|\bcnc-?fräs|fräsmaskin|bearbetningscent|fresatric|centr[oi]\s?di\s?lavoro|centros?\s?de\s?usinagem|centros?\s?de\s?maquinagem|centr\S*\s?obróbcz|frezark|obráběcí\S*\s?cent|frézk|frézovac|obrábac\S*\s?cent|obdelovaln\S*\s?cent|rezkaln|megmunkáló\s?központ|megmunkálóközpont|marógép|加工中心|铣床|マシニング\s?センタ|フライス盤|머시닝\s?센터|밀링|обрабатывающ|фрезерн|işleme\s?merkez|freze/],
 ];
 // Baureihen, an denen man den Hersteller auch ohne Markennamen erkennt
 const MODEL_BRAND = [
@@ -34,7 +39,7 @@ const MODEL_BRAND = [
   [/\ba\d{2}nx\b/, 'makino'], [/hyperturn|maxxturn/, 'emco'], [/\bpuma\b|\blynx\b/, 'doosan'], [/cincom/, 'citizen'], [/swiss\s?(gt|st|dt)/, 'tornos'],
   [/helitronic/, 'walter'], [/\bc\s?(12|22|32|42|52|62)\b(?!\s?(mm|°))/, 'hermle'],
 ];
-const MACHINE_WORD = /maschine|machine|bearbeitungszentr|zentren|center|centre|fräs|dreh|lathe|mill|torno|fresadora|baz|vmc|hmc/;
+const MACHINE_WORD = /maschine|machine|bearbeitungszentr|zentren|center|centre|fräs|dreh|lathe|mill|torno|fresadora|baz|vmc|hmc|portal|bohrwerk|karussell/;
 const UNIT_AFTER = /^\s*(-?\s?)?(%|€|eur|euro|usd|\$|schicht|shift|turno|équipe|poste|werkzeug|tool|outil|herramient|tag|day|jour|día|dia|min|sek|sec|std|stunde|hour|h\b|jahr|year|an\b|año|mitarbeit|employee|people|personne|empleado|µm|mm|m\b|m²|qm|u\/min|upm|rpm|1\/min|min-1|kw|kva|t\b|kg|wechsel|change|teile|parts|pièces|piezas|stk\.?\s?(werkzeug|tool)|achs|axis|axe|eje|°)/;
 
 function normalize(text) {
@@ -44,6 +49,10 @@ function normalize(text) {
   s = s.replace(/\b(ein|zwei|drei)-?(schicht)/g, (m, a, b) => ({ ein: 1, zwei: 2, drei: 3 }[a]) + b);
   s = s.replace(/\p{L}+/gu, (w) => (NUMW[w] !== undefined ? String(NUMW[w]) : w));
   s = s.replace(/\bdue (?=turni|macchine|torni|fresatrici|centri|rettificatrici)/g, '2 ');   // »due« nur italienisch als Zahl
+  // 两班 / 三台 / 十二台 / 두 대 → Ziffern (nur vor Zählwörtern, damit Namen und Wörter unberührt bleiben)
+  const CN = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+  s = s.replace(/([一二两三四五六七八九]?十[一二三四五六七八九]?|[一二两三四五六七八九])(?=\s?(台|班|个|部|シフト|交代|直|名|人))/g, (m) => String(m.includes('十') ? (CN[m[0]] || 1) * 10 + (CN[m[m.length - 1]] && m[m.length - 1] !== '十' ? CN[m[m.length - 1]] : 0) : CN[m]));
+  s = s.replace(/(^|\s)(한|두|세|네)\s?(?=대|교대|명)/g, (m, a, k) => a + { 한: 1, 두: 2, 세: 3, 네: 4 }[k] + ' ');
   s = s.replace(/(\d+)\s?(x|×|mal|stk\.?|stück|pcs\.?|units?|unidades|unités)\s/g, '$1 ');
   return s;
 }
@@ -123,9 +132,12 @@ const PRODUCT_WORDS = [
   ['smile', /\bsmile\b/], ['venturion', /venturion/], ['hyperion', /hyperion/], ['redomatic', /redomatic/],
   ['powershrink', /powershrink|schrumpfger(ä|ae)t|shrink(-fit)?\s?(machine|unit)/], ['toolbalancer', /toolbalancer|wuchtmaschine|auswuchtmaschine|balancing\s?machine|wuchten/],
   ['keeper', /\bkeeper\b/], ['toolorganizer', /toolorganizer/], ['toolstation', /toolstation|montagewerkbank|werkbank/],
-  ['zidcode', /zidcode/], ['toolcart', /toolcart|werkzeugwagen|tool\s?cart/], ['loadbox', /loadbox/], ['robobox', /robobox|roboter|automatisiert(es)?\s?einstell/],
+  ['zidcode', /zidcode(?!\s?4)/], ['toolcart', /toolcart|werkzeugwagen|tool\s?cart/], ['loadbox', /loadbox/], ['robobox', /robobox|roboter|automatisiert(es)?\s?einstell/],
   ['genius', /\bgenius\b/], ['pombasic', /pombasic/], ['roboset-2', /roboset/], ['coramachineload', /coramachineload|maschinenbeladung/],
-  ['idchip', /idchip|id-chip/], ['tms-gold', /tms\s?gold|\bgold\b/], ['tms-silver', /tms\s?silver|\bsilver\b/],
+  ['idchip', /idchip|id-chip/], ['idlabel', /idlabel|id-label/], ['ztower', /ztower|z-tower/], ['twister', /\btwister\b/], ['autolock', /autolock/],
+  ['micbox', /micbox/], ['corameasure', /corameasure/], ['coralogistic', /coralogistic|coraexpress/], ['hobcheck', /hobcheck/], ['titan', /\btitan\b(?!\s?(und|and|y|et|e|-?legier|alloy|bearbeit|zerspan|machin|fräs))/],
+  ['smartcheck', /smartcheck/], ['tms-core', /tms\s?core/], ['zstock', /z\.?\s?stock/], ['zresources', /z\.?\s?resources/], ['zintegration', /z\.?\s?integration/],
+  ['zshopfloor', /z\.?\s?shopfloor/], ['zconnectivity', /z\.?\s?connectivity/], ['zcam', /z\.?\s?cam\b/], ['zidcode40', /zidcode\s?4\.?0/],
 ];
 
 export function parse(text, ctx = {}) {
@@ -163,6 +175,17 @@ export function parse(text, ctx = {}) {
       if (a) count = +a[1];
     }
     if (!br && !count) continue;
+    // »6 Bearbeitungszentren (Haas)«, »マシニングセンタ 6 台（Haas）«: Marke ohne Zahl und Maschinenart gehört zur Gruppe davor
+    if (br && !count && !tword && lastGroups.length === 1 && !lastGroups[0].brand) {
+      const g = lastGroups[0], mod = modelOf(br.b, seg, orig);
+      g.brand = br.b.name; g.model = g.model || mod.model; g._generic = false;
+      if (!g.control || g._ctlGuess) { g.control = ctl || mod.ctl || br.b.ctl || g.control; g._ctlGuess = !ctl; }
+      if (mod.type) g.type = mod.type;
+      if (holder) g.holder = holder;
+      out.hits = out.hits.filter(h => h.kind !== 'machine' || !h.label.startsWith(g.count + '×'));
+      hit('machine', `${g.count}× ${[g.brand, g.model].filter(Boolean).join(' ')}`.trim());
+      continue;
+    }
     if (!count) count = /\b(mehrere|several|some|einige|plusieurs|varias|varios)\b/.test(seg) ? 2 : 1;
     const mod = modelOf(br?.b, seg, orig);
     // Baureihe ist am genauesten, dann spezielle Typwörter (5-Achs, Langdreher …), dann allgemeine (Fräsmaschine), dann Marke
@@ -172,11 +195,19 @@ export function parse(text, ctx = {}) {
     out.machines.push(g); lastGroups = [g];
     hit('machine', `${count}× ${[g.brand, g.model].filter(Boolean).join(' ') || ''}`.trim());
   }
-  // »8 Fräsmaschinen (4 DMU 50, 2 Hermle, 2 Haas)«: die Sammelangabe ohne Marke fällt weg, wenn die Einzelangaben sie ergeben
+  // »8 Fräsmaschinen (4 DMU 50, 2 Hermle, 2 Haas)« / »6 DMG MORI (4 DMU 50, 2 DMC 65)«: eine Sammelangabe fällt weg, wenn die
+  // direkt folgenden Angaben derselben Art (bzw. desselben Herstellers) genau ihre Anzahl ergeben
+  const FAM = { vmc: 'm', '5ax': 'm', hmc: 'm', gantry: 'm', boring: 'm', lathe: 't', turnmill: 't', swiss: 't', multispindle: 't', vtl: 't', grinder: 'g', gear: 'z', other: 'o' };
   out.machines = out.machines.filter((g, i) => {
     if (g.model) return true;
-    const rest = out.machines.slice(i + 1).filter(x => (x.model || x.type !== g.type || !g._generic) && (g._generic || x.brand === g.brand));
-    return !rest.length || rest.reduce((a, x) => a + x.count, 0) !== g.count;
+    let sum = 0;
+    for (const x of out.machines.slice(i + 1)) {
+      const same = g._generic ? (FAM[x.type] === FAM[g.type] || g.type === 'other') : x.brand === g.brand;
+      if (!same) break;
+      sum += x.count;
+      if (sum >= g.count) break;
+    }
+    return sum !== g.count;
   });
   // gleiche Gruppen zusammenfassen
   const merged = [];
@@ -188,7 +219,7 @@ export function parse(text, ctx = {}) {
 
   // ---------------------------------------------------------- Produktion
   let m;
-  if ((m = s.match(/(?<!\d)(\d)\s?-?\s?(schicht|shift|turno|équipe|equipe|poste|vardiya|смен(?!\S*\s?инструм)|zmian|zmiany|směn|zmen|műszak|izmen|turni|skift|交代|班|교대)/))) P.shifts = Math.min(3, +m[1]);
+  if ((m = s.match(/(?<!\d)(\d)\s?-?\s?(schicht|shift|turno|équipe|equipe|poste|vardiya|смен(?!\S*\s?инструм)|zmian|zmiany|směn|zmen|műszak|izmen|turni|skift|交代(?!あたり|当たり)|シフト(?!あたり|当たり)|直(?!径)|班|교대(?!당))/))) P.shifts = Math.min(3, +m[1]);
   else if (/24\s?\/\s?7|rund um die uhr|around the clock|24 stunden|24 hours|3schicht|vollkonti/.test(s)) P.shifts = 3;
   else if (/(1|ein)schicht|single shift/.test(s)) P.shifts = 1;
   else if ((m = s.match(/(\d)schicht/))) P.shifts = Math.min(3, +m[1]);
@@ -272,7 +303,7 @@ export function parse(text, ctx = {}) {
   else if (/messschieber|messuhr|caliper|von hand mess|ohne einstellgerät|kein(en)?\s(voreinstell|einstell)gerät|no\s?presetter|without\s?a?\s?presetter|sin\s?preajust|pied à coulisse|calibre/.test(s)) P.measure = 'manual';
   else if (/in der maschine|antast|messtaster|tastsystem|laser\s?(in der|an der) maschine|touch[- ]?off|in[- ]machine|on the machine|probe|papierstreifen|z-?setter|en máquina|en la máquina|dans la machine|na máquina|nella macchina|in macchina|i maskinen|機内|机内|在机床|기계 안|в станке|на станке|tezgâhta|tezgahta|w maszynie|ve stroji|v stroji|a gépben|v stroju|blum|renishaw|tool\s?setter/.test(s)) P.measure = 'machine';
   if (P.measure) hit('measure', P.measure);
-  if (/postprozessor|post-?processor|\brfid\b|balluff|direkt in die steuerung|dnc|netzwerk/.test(s) && !/tippen|abtipp/.test(s)) P.data = 'post';
+  if (/postprozessor|post-?processor|\brfid\b|balluff|direkt in die steuerung|\bdnc\b/.test(s) && !/tippen|abtipp/.test(s)) P.data = 'post';
   else if (/zettel|papier|einrichteblatt|aufschreiben|paper|hand-?written|notiz|papel|feuille|紙|纸|종이|бумаг|kâğıt|kağıt|kartk|papír|papir/.test(s)) P.data = 'paper';
   else if (/abtipp|eintipp|tippen|von hand (ein|in)|manuell (ein|übertr)|tippfehler|eingabefehler|type (it|them|values) in|typing|type in|key in|manual(ly)? (enter|entry|input)|saisie manuelle|saisiss|à la main|a mano|teclea|tecleamos|tecleo|digitamos|à mão|手入力|手动输入|手工输入|직접 입력|вручную|elle gir|ręcznie|ručně|ručne|kézzel|ročno|a mano|för hand/.test(s)) P.data = 'typed';
   if (P.data) hit('data', P.data);
@@ -280,6 +311,22 @@ export function parse(text, ctx = {}) {
   else if (/regal|schublade|offene[nm]?\s?(lager|schr)|such(en|zeit|t|e)|chaos|unordnung|kisten|kartons|shelves|drawers|search|cherch|busca|desorden/.test(s)) P.storage = 'open';
   else if (/werkzeugschr(ä|a)nk|lagerschr(ä|a)nk|schrank|cabinet|armoire|armario/.test(s)) P.storage = 'cabinets';
   if (P.storage) hit('storage', P.storage);
+
+  // Netzwerk an den Maschinen (»zidCode 4.0« braucht es, »zidCode« nicht)
+  const NONET = /(kein(e|en)?|ohne|nicht)\s([a-zäöü]+\s){0,2}(netzwerk|vernetzt|lan\b|ethernet)|no\s(network|lan)|not\s(networked|connected)|without\s(a\s)?network|offline|sans réseau|pas de réseau|sin red\b|sin conexión|senza rete|bez sítě|bez sieci|hálózat nélkül|brez omrežja|utan nätverk|sem rede|没有网络|无网络|ネットワーク(なし|がない)|네트워크(가)?\s?없|без сети|ağ yok|ağa bağlı değil/;
+  const NET = /netzwerk|vernetzt|network|ethernet|\blan\b|réseau|\ben red\b|red (de planta|industrial|interna)|\brete\b|síť|sieć|hálózat|omrežj|nätverk|\brede\b|网络|ネットワーク|네트워크|сеть|сети|\bağ(a|ı|da)?\b/;
+  if (NONET.test(s)) { P.network = 'no'; hit('network', 'no'); }
+  else if (NET.test(s)) { P.network = 'yes'; hit('network', 'yes'); }
+  // Werkzeuggrößen (Länge, Durchmesser in mm)
+  if ((m = s.match(/(werkzeug)?(länge|laenge|lang|long|length|longueur|longitud|lunghezza|délk|długoś|hossz|dolžin|längd|comprimento|长度|長さ|길이|длин|uzunlu)\D{0,18}?(\d{3,4})\s?mm/)) ||
+      (m = s.match(/()()(\d{3,4})\s?mm\s?(lang|long|lange|length|de long|de largo|lunghi|dlouh|długi|hosszú)/))) { P.maxLen = Math.min(3000, +m[3]); hit('maxlen', P.maxLen); }
+  else if (/lange werkzeuge|bohrstange|boring bars?|long tools|outils longs|herramientas largas|utensili lunghi|reibahle|reamers?/.test(s)) { P._longTools = true; }
+  if ((m = s.match(/(ø|⌀|durchmesser|diameter|diamètre|diámetro|diametro|průměr|średnic|átmérő|premer|diâmetro|直径|지름|диаметр|çap)\D{0,14}?(\d{2,4})\s?mm/)) || (m = s.match(/()\bd\s?=?\s?(\d{3,4})\s?mm/))) {
+    if (+m[2] >= 40) { P.maxDia = Math.min(2000, +m[2]); hit('maxdia', P.maxDia); }
+  } else if (/messerk(ö|oe)pf|planfräser|planmesserkopf|face\s?mills?|fraises? à surfacer|fresas? de planear/.test(s)) P._bigCutters = true;
+  if (/wendeschneidplatte|wendeplatte|\bwsp\b|indexable|\binserts?\b|plaquettes?|plaquitas?|inserti|vbd|płytk|vyměnitelné destičky|váltólapk|obračljiv|vändskär|pastilhas?|可转位|インサート|인서트|сменн\S* пластин|kesici uç/.test(s)) { P.inserts = true; hit('inserts', true); }
+  if (/\berp\b|\bsap\b|\babas\b|proalpha|navision|business central|\binfor\b|\bmes\b/.test(s)) { P.erp = true; hit('erp', true); }
+  if (/prüfmittel|pruefmittel|messmittel|vorrichtungen|\blehren\b|gauges|fixtures|calibration|kalibrier|moyens de contrôle|instrumentos de medición|calibri|měřidl|przyrząd|mérőeszköz|merilk|mätdon|instrumentos de medição|量具|ゲージ|게이지|калибр|mastar/.test(s)) { P.gauges = true; hit('gauges', true); }
 
   // ---------------------------------------------------------- Probleme + Ziele
   const PAINS = [
@@ -323,7 +370,9 @@ export function apply(profile, r, newMachine, first) {
   const p = profile;
   const known = new Set(p.known);
   const set = (k, v) => { if (v === undefined || v === null || v === '') return; p[k] = v; known.add(k); };
-  for (const k of ['shifts', 'days', 'rate', 'staff', 'tools', 'invest', 'industry', 'measure', 'data', 'storage', 'shrink', 'hsc', 'grind', 'series', 'cam', 'tier']) set(k, r.patch[k]);
+  for (const k of ['shifts', 'days', 'rate', 'staff', 'tools', 'invest', 'industry', 'measure', 'data', 'storage', 'shrink', 'hsc', 'grind', 'series', 'cam', 'tier', 'network', 'maxLen', 'maxDia', 'inserts', 'erp', 'gauges']) set(k, r.patch[k]);
+  if (r.patch._longTools && !p.maxLen) p.maxLen = 600;
+  if (r.patch._bigCutters && !p.maxDia) p.maxDia = 250;
   const sh = p.shifts || 2;
   if (r.patch.changes) set('changes', Math.min(60, r.patch.changes));
   if (r.machines.length) {
@@ -359,7 +408,9 @@ export function missing(p) {
   if (!k.has('shifts')) q.push('shifts');
   if (!k.has('measure')) q.push('measure');
   if (!k.has('changes')) q.push('changes');
+  if (!k.has('maxLen') && p.machines.some(m => ['hmc', 'gantry', 'boring', 'vtl', '5ax'].includes(m.type))) q.push('toolsize');
   if (!k.has('data') && p.measure !== 'zoller') q.push('data');
+  if (!k.has('network') && p.data !== 'post' && p.machines.some(m => CONTROLS[m.control]?.dmi)) q.push('network');
   if (!k.has('storage')) q.push('storage');
   if (!k.has('shrink')) q.push('shrink');
   if (!k.has('hsc') && p.machines.some(m => ['vmc', '5ax', 'hmc'].includes(m.type))) q.push('hsc');

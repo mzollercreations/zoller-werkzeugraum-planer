@@ -1,35 +1,71 @@
 // Prozedurale CNC-Maschinen des Kunden (kein Hersteller-CAD nötig). Ursprung = Mitte der Grundfläche auf dem Boden,
-// Bedienseite zeigt nach +Z. Jede Maschine hat eine Signalsäule (userData.andon) und einen Steuerungsbildschirm
-// (userData.screen), die der Planer je nach Ansicht (heute / mit ZOLLER) umschaltet.
+// Bedienseite zeigt nach +Z. Jede Maschinenart hat ihre typische Bauform (Türen, Fenster mit Arbeitsraum, Magazin,
+// Späneförderer, Schaltschrank, Bedienpult); Farben und Schriftzug folgen der Farbwelt des Herstellers (ohne Logos).
+// Jede Maschine hat eine Signalsäule (userData.andon) und einen Steuerungsbildschirm (userData.screen), die der Planer
+// je nach Ansicht (heute / mit ZOLLER) umschaltet.
 import * as THREE from 'three';
 import { mergeGeometries } from '../vendor/BufferGeometryUtils.js';
 
+// ------------------------------------------------------------------ Farbwelten der Hersteller (Lack, Unterbau, Zierleiste, Schrift)
+const STYLES = {
+  dmgmori:  { body: '#eceeef', door: '#2b2e33', lower: '#2b2e33', trim: '#1b1d20', text: '#1b1d20', panel: 'tall', doorDark: true },
+  hermle:   { body: '#d9dde0', door: '#d9dde0', lower: '#5b6268', trim: '#5b6268', text: '#3d4247', panel: 'arm' },
+  haas:     { body: '#c9ccce', door: '#c9ccce', lower: '#2a2c2e', trim: '#b5201c', text: '#b5201c', panel: 'pendant' },
+  mazak:    { body: '#f0f1f1', door: '#f0f1f1', lower: '#465564', trim: '#2e5f8a', text: '#2e5f8a', panel: 'integrated' },
+  okuma:    { body: '#f1f0ea', door: '#f1f0ea', lower: '#3a3f3c', trim: '#2d7a4f', text: '#2d7a4f', panel: 'integrated' },
+  makino:   { body: '#e3e6e9', door: '#e3e6e9', lower: '#26375f', trim: '#21409a', text: '#21409a', panel: 'arm' },
+  matsuura: { body: '#e8ebee', door: '#e8ebee', lower: '#2e3a48', trim: '#1f6fb2', text: '#1f6fb2', panel: 'arm' },
+  grob:     { body: '#dfe2e4', door: '#2b2e32', lower: '#2b2e32', trim: '#c41e2a', text: '#c41e2a', panel: 'tall', doorDark: true },
+  chiron:   { body: '#e9ecee', door: '#e9ecee', lower: '#30363c', trim: '#0f5aa6', text: '#0f5aa6', panel: 'arm' },
+  heller:   { body: '#e2e5e7', door: '#e2e5e7', lower: '#2c3640', trim: '#003b70', text: '#003b70', panel: 'integrated' },
+  index:    { body: '#e6e9eb', door: '#e6e9eb', lower: '#37404a', trim: '#004f9f', text: '#004f9f', panel: 'integrated' },
+  traub:    { body: '#e6e9eb', door: '#e6e9eb', lower: '#37404a', trim: '#00508f', text: '#00508f', panel: 'integrated' },
+  citizen:  { body: '#eef0f1', door: '#eef0f1', lower: '#3b4652', trim: '#00468c', text: '#00468c', panel: 'integrated' },
+  star:     { body: '#eef0f1', door: '#eef0f1', lower: '#3b4652', trim: '#0065b3', text: '#0065b3', panel: 'integrated' },
+  doosan:   { body: '#eef0f2', door: '#eef0f2', lower: '#2f3842', trim: '#0a5aa8', text: '#0a5aa8', panel: 'integrated' },
+  brother:  { body: '#e9ebed', door: '#e9ebed', lower: '#2f3640', trim: '#1a3c7a', text: '#1a3c7a', panel: 'integrated' },
+  spinner:  { body: '#eef0f1', door: '#eef0f1', lower: '#33383d', trim: '#c8102e', text: '#c8102e', panel: 'arm' },
+  emco:     { body: '#eef0f1', door: '#eef0f1', lower: '#33383d', trim: '#d71920', text: '#d71920', panel: 'integrated' },
+  liebherr: { body: '#e2e4e5', door: '#e2e4e5', lower: '#4a4f54', trim: '#f6c300', text: '#3a3f44', panel: 'arm' },
+  fanucrobo:{ body: '#efe9c6', door: '#efe9c6', lower: '#3a3a36', trim: '#f2c500', text: '#3a3a36', panel: 'integrated' },
+  kern:     { body: '#e4e6e8', door: '#e4e6e8', lower: '#3c3c3c', trim: '#3c3c3c', text: '#3c3c3c', panel: 'arm' },
+  starrag:  { body: '#e3e6e9', door: '#e3e6e9', lower: '#2b3a4b', trim: '#00447c', text: '#00447c', panel: 'pendant' },
+};
+const DEFAULT_STYLE = { body: '#e4e7e9', door: '#e4e7e9', lower: '#33383d', trim: null, text: null, panel: 'arm' };
+
+// ------------------------------------------------------------------ Materialien (je Farbe einmal)
 const M = {};
+const cache = new Map();
+const phys = (o) => new THREE.MeshPhysicalMaterial(o);
 function mats() {
-  if (M.body) return M;
-  const phys = (o) => new THREE.MeshPhysicalMaterial(o);
-  M.body = phys({ color: 0xdfe2e4, roughness: .38, clearcoat: .35, clearcoatRoughness: .22 });
-  M.body2 = phys({ color: 0xd2d6d9, roughness: .42, clearcoat: .2 });
+  if (M.dark) return M;
   M.dark = phys({ color: 0x2b2e32, roughness: .5, clearcoat: .15 });
-  M.base = new THREE.MeshStandardMaterial({ color: 0x1c1e21, roughness: .7 });
-  M.cavity = new THREE.MeshStandardMaterial({ color: 0x3d4247, roughness: .65 });
-  M.steel = new THREE.MeshStandardMaterial({ color: 0xaeb4b8, roughness: .28, metalness: .9 });
-  M.glass = phys({ color: 0x9fb4c0, roughness: .04, metalness: 0, transparent: true, opacity: .28, envMapIntensity: 1.6, depthWrite: false });
+  M.black = phys({ color: 0x141517, roughness: .4, clearcoat: .3 });
+  M.base = new THREE.MeshStandardMaterial({ color: 0x1c1e21, roughness: .75 });
+  M.cavity = new THREE.MeshStandardMaterial({ color: 0x4a5056, roughness: .6, metalness: .2 });
+  M.cavityDark = new THREE.MeshStandardMaterial({ color: 0x2f3439, roughness: .7, metalness: .1 });
+  M.steel = new THREE.MeshStandardMaterial({ color: 0xb5bbbf, roughness: .28, metalness: .9 });
+  M.steelDark = new THREE.MeshStandardMaterial({ color: 0x6d757b, roughness: .35, metalness: .85 });
+  M.glass = phys({ color: 0x9fb2be, roughness: .08, metalness: 0, transparent: true, opacity: .16, envMapIntensity: .45, depthWrite: false });
   M.rubber = new THREE.MeshStandardMaterial({ color: 0x111214, roughness: .9 });
+  M.cable = new THREE.MeshStandardMaterial({ color: 0x1a1b1d, roughness: .8 });
+  M.chips = new THREE.MeshStandardMaterial({ color: 0x8f969b, roughness: .5, metalness: .7 });
+  M.warn = new THREE.MeshStandardMaterial({ color: 0xf0c400, roughness: .45 });
   M.andonOff = new THREE.MeshStandardMaterial({ color: 0x5b6066, roughness: .3, transparent: true, opacity: .85 });
   M.green = new THREE.MeshStandardMaterial({ color: 0x1f9d55, emissive: 0x22c55e, emissiveIntensity: 2.2, roughness: .3 });
   M.amber = new THREE.MeshStandardMaterial({ color: 0xc58a00, emissive: 0xffb000, emissiveIntensity: 2.2, roughness: .3 });
   M.red = new THREE.MeshStandardMaterial({ color: 0xa31515, emissive: 0xff2b2b, emissiveIntensity: 2.0, roughness: .3 });
   return M;
 }
-const accentCache = new Map();
-function accentMat(hex) {
-  if (!accentCache.has(hex)) accentCache.set(hex, new THREE.MeshPhysicalMaterial({ color: new THREE.Color(hex), roughness: .32, clearcoat: .5 }));
-  return accentCache.get(hex);
+function paint(hex, o = {}) {
+  const k = hex + JSON.stringify(o);
+  if (!cache.has(k)) cache.set(k, phys({ color: new THREE.Color(hex), roughness: .36, clearcoat: .35, clearcoatRoughness: .22, ...o }));
+  return cache.get(k);
 }
 
-// abgerundeter Quader (senkrechte Kanten rund), Ursprung unten mittig
+// ------------------------------------------------------------------ Geometrie-Helfer
 const rboxCache = new Map();
+// abgerundeter Quader (senkrechte Kanten rund), Ursprung unten mittig
 export function rbox(w, h, d, r = .08) {
   const k = [w, h, d, r].map(v => v.toFixed(3)).join();
   if (rboxCache.has(k)) return rboxCache.get(k);
@@ -45,24 +81,27 @@ export function rbox(w, h, d, r = .08) {
   return g;
 }
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+const cyl = (r0, r1, h, n = 24) => new THREE.CylinderGeometry(r0, r1, h, n);
 function mesh(geo, mat, x = 0, y = 0, z = 0, parent) {
   const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
   if (parent) parent.add(m);
   return m;
 }
+// Quader mit Mittelpunkt (x, y, z)
+const B = (p, mat, w, h, d, x, y, z) => mesh(box(w, h, d), mat, x, y, z, p);
 
-// ------------------------------------------------------------------ Steuerungsbildschirm (Canvas)
+// ------------------------------------------------------------------ Texturen (Canvas)
 const screenCache = new Map();
 export function screenTexture(controlName, state, lang = 'de') {
   const k = controlName + '|' + state + '|' + lang;
   if (screenCache.has(k)) return screenCache.get(k);
-  const c = document.createElement('canvas'); c.width = 256; c.height = 192;
-  const g = c.getContext('2d');
+  const c = document.createElement('canvas'); c.width = 512; c.height = 384;
+  const g = c.getContext('2d'); g.scale(2, 2);
   const grd = g.createLinearGradient(0, 0, 0, 192); grd.addColorStop(0, '#1d2a36'); grd.addColorStop(1, '#0d141b');
   g.fillStyle = grd; g.fillRect(0, 0, 256, 192);
   g.fillStyle = '#2e4456'; g.fillRect(0, 0, 256, 22);
   g.fillStyle = '#cfe3f2'; g.font = '600 11px Helvetica, Arial'; g.fillText(controlName || 'CNC', 8, 15);
-  g.font = '10px Helvetica, Arial'; g.fillStyle = '#8fb2cc';
+  g.font = '10px Helvetica, Arial';
   const axes = [['X', '-124.882'], ['Y', '38.410'], ['Z', '212.005']];
   axes.forEach(([a, v], i) => { g.fillStyle = '#8fb2cc'; g.fillText(a, 10, 44 + i * 18); g.fillStyle = '#e6f2fb'; g.font = '600 12px Menlo, monospace'; g.fillText(v, 30, 44 + i * 18); g.font = '10px Helvetica, Arial'; });
   g.fillStyle = '#16212b'; g.fillRect(132, 30, 116, 72);
@@ -79,12 +118,26 @@ export function screenTexture(controlName, state, lang = 'de') {
   g.fillStyle = '#22313d'; for (let i = 0; i < 6; i++) g.fillRect(8 + i * 41, 166, 37, 18);
   g.fillStyle = '#2b4a63'; g.fillRect(8, 112, 240, 44);
   g.fillStyle = '#7fa6c3'; for (let i = 0; i < 4; i++) g.fillRect(14, 120 + i * 9, 40 + ((i * 53) % 150), 4);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   screenCache.set(k, t);
   return t;
 }
-
-// Typenschild mit Hersteller und Baureihe
+// Schriftzug des Herstellers (nur Text, kein Logo) – transparent, in der Farbe der Marke
+const letterCache = new Map();
+function lettering(text, color, bg) {
+  const k = text + color + bg;
+  if (letterCache.has(k)) return letterCache.get(k);
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 128;
+  const g = c.getContext('2d');
+  if (bg) { g.fillStyle = bg; g.fillRect(0, 0, 1024, 128); }
+  g.fillStyle = color; g.font = '800 92px "T-Star", Helvetica, Arial'; g.textBaseline = 'middle';
+  const w = Math.min(1000, g.measureText(text).width);
+  g.fillText(text, (1024 - w) / 2, 68, 1000);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  t.userData = { w: w / 1024 };
+  letterCache.set(k, t);
+  return t;
+}
 function plateTexture(text) {
   const c = document.createElement('canvas'); c.width = 512; c.height = 64;
   const g = c.getContext('2d');
@@ -92,147 +145,337 @@ function plateTexture(text) {
   g.fillStyle = '#f2f4f5'; g.font = '600 30px "T-Star", Helvetica, Arial'; g.textBaseline = 'middle';
   const w = Math.min(480, g.measureText(text).width);
   g.fillText(text, (512 - w) / 2, 34, 480);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return t;
 }
 
+// ------------------------------------------------------------------ Baugruppen
 function andon(parent, x, y, z) {
   const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g);
-  mesh(new THREE.CylinderGeometry(.012, .012, .22, 8), M.steel, 0, .11, 0, g);
+  mesh(cyl(.012, .012, .22, 8), M.steel, 0, .11, 0, g);
   const segs = [];
-  [M.red, M.amber, M.green].forEach((_, i) => {
-    const s = mesh(new THREE.CylinderGeometry(.045, .045, .07, 16), M.andonOff, 0, .52 - i * .075, 0, g);
+  [0, 1, 2].forEach((i) => {
+    const s = mesh(cyl(.045, .045, .07, 16), M.andonOff, 0, .52 - i * .075, 0, g);
     s.castShadow = false; s.userData.keep = true; segs.push(s);
   });
-  mesh(new THREE.CylinderGeometry(.03, .045, .03, 16), M.dark, 0, .58, 0, g);
+  mesh(cyl(.03, .045, .03, 16), M.dark, 0, .58, 0, g);
   return segs;     // [rot, gelb, grün]
 }
-
-function panel(parent, x, y, z, rotY, ctrlName, lang) {
+// Bedienpult: 'arm' (schwenkbar am Arm), 'pendant' (hängend), 'tall' (hohes Touch-Pult), 'integrated' (in der Front)
+function controlPanel(parent, kind, x, y, z, rotY, ctl, lang, frame) {
   const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rotY; parent.add(g);
-  mesh(box(.06, .5, .06), M.dark, 0, -.25, -.1, g);
-  const body = mesh(box(.56, .7, .1), M.dark, 0, .2, 0, g);
-  body.rotation.x = -.12;
-  const scr = new THREE.Mesh(new THREE.PlaneGeometry(.42, .315), new THREE.MeshBasicMaterial({ map: screenTexture(ctrlName, 'before', lang), toneMapped: false }));
-  scr.position.set(0, .3, .052); scr.rotation.x = -.12; scr.userData.keep = true; g.add(scr);
-  mesh(box(.46, .18, .02), M.base, 0, -.02, .058, g).rotation.x = -.12;
+  let sw = .42, sh = .315, tilt = -.12;
+  if (kind === 'tall') {
+    sw = .36; sh = .48; tilt = -.05;
+    B(g, frame, .5, 1.1, .12, 0, .05, 0);
+    B(g, M.base, .44, .2, .03, 0, -.33, .065).rotation.x = -.12;
+  } else if (kind === 'pendant') {
+    B(g, M.steelDark, .06, .6, .06, 0, .62, -.12);
+    B(g, frame, .58, .72, .12, 0, .05, 0);
+    B(g, M.base, .48, .17, .03, 0, -.2, .062);
+  } else if (kind === 'integrated') {
+    B(g, frame, .56, .9, .1, 0, .05, 0); tilt = -.08;
+    B(g, M.base, .46, .2, .03, 0, -.25, .052);
+  } else {
+    B(g, M.steelDark, .06, .5, .06, 0, -.25, -.1);
+    const body = B(g, frame, .56, .7, .1, 0, .2, 0); body.rotation.x = -.12;
+    B(g, M.base, .46, .18, .02, 0, -.02, .058).rotation.x = -.12;
+  }
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), new THREE.MeshBasicMaterial({ map: screenTexture(ctl, 'before', lang), toneMapped: false }));
+  const sy = kind === 'tall' ? .28 : kind === 'pendant' ? .2 : kind === 'integrated' ? .2 : .3;
+  scr.position.set(0, sy, kind === 'tall' ? .062 : .052 + (kind === 'arm' ? .004 : 0)); scr.rotation.x = tilt; scr.userData.keep = true; g.add(scr);
   return scr;
 }
-
-// Fenster mit Einblick: dunkler Arbeitsraum + Spindel/Futter + Glas
-function windowWithInterior(parent, cx, cy, fz, w, h, kind) {
-  mesh(box(w + .1, h + .1, .03), M.dark, cx, cy, fz + .015, parent);
-  mesh(box(w, h, .02), M.cavity, cx, cy, fz + .035, parent);
-  if (kind === 'mill') {
-    mesh(new THREE.CylinderGeometry(.09, .11, .32, 16), M.steel, cx + w * .05, cy + h * .22, fz + .05, parent);
-    mesh(new THREE.CylinderGeometry(.018, .018, .12, 8), M.steel, cx + w * .05, cy + h * .02, fz + .05, parent);
-    mesh(box(w * .7, .06, .03), M.steel, cx, cy - h * .3, fz + .05, parent);
-  } else if (kind === 'turn') {
-    const ch = mesh(new THREE.CylinderGeometry(.16, .16, .05, 24), M.steel, cx - w * .3, cy, fz + .055, parent); ch.rotation.x = Math.PI / 2;
-    mesh(box(.22, .22, .03), M.dark, cx + w * .22, cy + h * .05, fz + .05, parent);
+// Fenster mit Einblick in den Arbeitsraum: Rückwand an der Front, Laibung so tief wie die Tür, Glas vorn bündig
+function windowWithInterior(parent, cx, cy, fz, w, h, kind, frameMat, depth = .24) {
+  B(parent, M.cavityDark, w + .04, h + .04, .02, cx, cy, fz + .01);
+  B(parent, frameMat, w + .1, .05, depth, cx, cy + h / 2 + .025, fz + depth / 2);
+  B(parent, frameMat, w + .1, .05, depth, cx, cy - h / 2 - .025, fz + depth / 2);
+  B(parent, frameMat, .05, h, depth, cx - w / 2 - .025, cy, fz + depth / 2);
+  B(parent, frameMat, .05, h, depth, cx + w / 2 + .025, cy, fz + depth / 2);
+  const z = fz + depth * .45, r = depth * .34;
+  if (kind === 'mill' || kind === '5ax' || kind === 'hmc') {
+    mesh(cyl(r * .8, r, h * .3), M.steelDark, cx + w * .06, cy + h * .28, z, parent);              // Spindelkopf
+    mesh(cyl(r * .4, r * .25, h * .09), M.steel, cx + w * .06, cy + h * .085, z, parent);          // Aufnahme
+    mesh(cyl(.012, .012, h * .1), M.steel, cx + w * .06, cy - h * .01, z, parent);                 // Werkzeug
+    if (kind === '5ax') {
+      B(parent, M.cavity, w * .66, h * .1, r * 1.2, cx, cy - h * .38, z);                         // Schwenkbrücke
+      mesh(cyl(Math.min(w * .14, r * 1.1), Math.min(w * .14, r * 1.1), .05, 32), M.steel, cx, cy - h * .3, z, parent);    // Rundtisch
+    } else if (kind === 'hmc') {
+      B(parent, M.steel, w * .55, .05, r * 1.6, cx, cy - h * .36, z);
+      B(parent, M.cavity, .22, h * .3, r * 1.2, cx - w * .1, cy - h * .18, z);                     // Spannturm
+    } else {
+      B(parent, M.steel, w * .72, .05, r * 1.6, cx, cy - h * .36, z);                              // Tisch
+      B(parent, M.steelDark, .2, .07, r, cx - w * .12, cy - h * .3, z);                            // Schraubstock
+    }
+  } else if (kind === 'turn' || kind === 'turnmill' || kind === 'swiss') {
+    const cr = kind === 'swiss' ? .08 : Math.min(.17, h * .3);
+    const ch = mesh(cyl(cr, cr, .06, 28), M.steel, cx - w * .3, cy, fz + .06, parent); ch.rotation.x = Math.PI / 2;
+    const tu = mesh(cyl(Math.min(.13, h * .24), Math.min(.13, h * .24), .05, 12), M.steelDark, cx + w * .2, cy + h * .08, fz + .06, parent); tu.rotation.x = Math.PI / 2;  // Revolver
+    if (kind === 'turnmill') mesh(cyl(r * .6, r * .7, h * .32), M.steelDark, cx, cy + h * .26, z, parent);                    // Frässpindel (B-Achse)
   } else if (kind === 'grind') {
-    const wh = mesh(new THREE.CylinderGeometry(.12, .12, .03, 24), M.steel, cx, cy + h * .12, fz + .05, parent); wh.rotation.x = Math.PI / 2;
+    const wh = mesh(cyl(.13, .13, .03, 32), M.steel, cx, cy + h * .12, fz + .07, parent); wh.rotation.x = Math.PI / 2;
+    const wh2 = mesh(cyl(.09, .09, .03, 32), M.cavity, cx + .1, cy + h * .12, fz + .1, parent); wh2.rotation.x = Math.PI / 2;
+    B(parent, M.steelDark, w * .5, .06, r, cx, cy - h * .3, z);
+  } else if (kind === 'gear') {
+    const hob = mesh(cyl(.06, .06, .22, 20), M.steel, cx - w * .1, cy + h * .1, z, parent); hob.rotation.z = Math.PI / 2 - .3;
+    const wp = mesh(cyl(.16, .16, .05, 32), M.steelDark, cx + w * .15, cy - h * .2, fz + .06, parent); wp.rotation.x = Math.PI / 2;
+  } else if (kind === 'vtl') {
+    mesh(cyl(w * .36, w * .36, .1, 40), M.steel, cx, cy - h * .4, fz + depth * .5, parent).scale.z = (depth * .9) / (w * .72);
+    B(parent, M.steelDark, .14, h * .5, r, cx + w * .12, cy + h * .05, z);
+  } else if (kind === 'multi') {
+    const dr = mesh(cyl(.26, .26, .08, 6), M.steelDark, cx - w * .15, cy, fz + .06, parent); dr.rotation.x = Math.PI / 2;
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const sp = mesh(cyl(.03, .03, .1, 12), M.steel, cx - w * .15 + Math.cos(a) * .17, cy + Math.sin(a) * .17, fz + .12, parent); sp.rotation.x = Math.PI / 2; }
   }
-  const gl = new THREE.Mesh(box(w, h, .012), M.glass); gl.position.set(cx, cy, fz + .075); gl.renderOrder = 2; parent.add(gl);
+  const gl = new THREE.Mesh(box(w, h, .012), M.glass); gl.position.set(cx, cy, fz + depth - .012); gl.renderOrder = 2; parent.add(gl);
+}
+// Schiebetüren: Türblatt um die Fensteröffnung, zwei Flügel mit Fuge und Griffen
+function doors(parent, cx, y0, fz, w, h, winH, kind, st, depth = .24) {
+  const doorMat = st.doorDark ? paint(st.door, { roughness: .3, clearcoat: .6 }) : paint(st.door);
+  const ow = w * .74, oh = winH, wy = y0 + h * .58, zc = fz + depth / 2;
+  const yb1 = wy - oh / 2 - .05, yt0 = wy + oh / 2 + .05, y1 = y0 + h;
+  B(parent, doorMat, w, yb1 - y0, depth, cx, (y0 + yb1) / 2, zc);
+  B(parent, doorMat, w, y1 - yt0, depth, cx, (yt0 + y1) / 2, zc);
+  const sw = (w - ow) / 2 - .05;
+  for (const s of [-1, 1]) B(parent, doorMat, sw, oh + .1, depth, cx + s * (ow / 2 + .05 + sw / 2), wy, zc);
+  for (const [a, b] of [[y0, yb1], [yt0, y1]]) B(parent, M.base, .012, b - a, depth + .004, cx, (a + b) / 2, zc);   // Fuge
+  for (const s of [-1, 1]) B(parent, M.steel, .03, h * .4, .04, cx + s * (ow / 2 + .05 + sw * .5), y0 + h * .5, fz + depth + .02);   // Griffe
+  windowWithInterior(parent, cx, wy, fz, ow, oh, kind, st.doorDark ? M.black : M.dark, depth);
+}
+function magazineDrum(parent, x, y, z, r, h, mat) {
+  mesh(cyl(r, r, h, 32), mat, x, y + h / 2, z, parent);
+  mesh(cyl(r * .92, r * .92, .04, 32), M.dark, x, y + h + .02, z, parent);
+}
+function chipConveyor(parent, x, z, len, rotY = 0) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rotY; parent.add(g);
+  const ramp = B(g, M.dark, .5, .14, len, 0, .55, 0); ramp.rotation.x = -.35;
+  B(g, M.dark, .5, .6, .4, 0, .3, len / 2 - .1);
+  const cart = B(g, M.steelDark, .7, .45, .55, 0, .26, len / 2 + .35);
+  B(g, M.chips, .6, .06, .45, 0, .5, len / 2 + .35);
+  mesh(cyl(.05, .05, .04, 12), M.rubber, -.28, .05, len / 2 + .12, g).rotation.z = Math.PI / 2;
+  return cart;
+}
+function cabinet(parent, w, h, d, x, z, mat) {
+  B(parent, mat, w, h, d, x, h / 2, z);
+  B(parent, M.base, w * .9, .04, .02, x, h * .82, z + d / 2 + .005);
+  B(parent, M.steel, .02, .2, .03, x + w * .38, h * .55, z + d / 2 + .02);
+}
+function brandOn(parent, text, color, x, y, z, width, rotY = 0) {
+  if (!text || !color) return;
+  const tex = lettering(text.toUpperCase(), color);
+  const h = width / 8;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(width, h), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: .5, depthWrite: false }));
+  m.position.set(x, y, z); m.rotation.y = rotY; m.userData.keep = true; m.renderOrder = 1; parent.add(m);
 }
 
+// Baugröße aus der Baureihe (Verfahrweg X in mm) – nur für Reihen mit eindeutiger Bezeichnung
+const HAAS_VF = [0, 508, 762, 1016, 1270, 1270, 1626, 2134, 1626, 2134, 3048, 3048, 3810];
+export function scaleFor(brandId, model, type) {
+  if (!model) return 1;
+  const m = model.toLowerCase();
+  let x = 0, n;
+  if ((n = m.match(/\bvf-?\s?(\d{1,2})/)) && brandId === 'haas') x = HAAS_VF[+n[1]] || 0;
+  else if ((n = m.match(/\bumc-?\s?(\d{3,4})/))) x = +n[1];
+  else if ((n = m.match(/\bc\s?(\d{2})\b/)) && brandId === 'hermle') x = (+n[1] - 2) * 20;
+  else if ((n = m.match(/\bdm[ucvf]\s?-?(\d{2,3})/))) x = +n[1] * 10;
+  if (!x) return 1;
+  const ref = type === '5ax' ? 650 : 600;
+  return Math.max(.85, Math.min(2.2, x / ref));
+}
+
+// ------------------------------------------------------------------ Maschine bauen
 export function buildMachine(type, opt = {}) {
   mats();
-  const accent = accentMat(opt.accent || '#3a3f45');
+  const st = { ...DEFAULT_STYLE, ...(STYLES[opt.brandId] || {}) };
+  if (!STYLES[opt.brandId] && opt.accent) { st.trim = opt.accent; st.text = opt.accent; }
+  const body = paint(st.body), lower = paint(st.lower, { roughness: .5, clearcoat: .1 }), trim = st.trim ? paint(st.trim, { roughness: .3, clearcoat: .5 }) : M.dark;
+  const frame = M.black;
   const ctl = opt.controlName || 'CNC';
   const lang = opt.lang || 'de';
+  const brandText = opt.brand || '';
+  const sc = scaleFor(opt.brandId, opt.model, type);
   const g = new THREE.Group(); g.name = 'machine';
   let W, H, D, scr, segs;
-  const plate = (y, z, w = 1.0) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 8), new THREE.MeshStandardMaterial({ map: plateTexture(opt.label || ''), roughness: .5 }));
-    m.position.set(0, y, z + .004); m.userData.keep = true; g.add(m);
+  const plate = (y, z, w = 1.0, x = 0) => {
+    if (!opt.label) return;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 8), new THREE.MeshStandardMaterial({ map: plateTexture(opt.label), roughness: .5 }));
+    m.position.set(x, y, z + .004); m.userData.keep = true; g.add(m);
+  };
+  const enclosure = (w, h, d, r, z = 0, baseH = .7) => {
+    B(g, M.base, w - .2, .12, d - .2, 0, .06, z);
+    mesh(rbox(w, baseH, d, r), lower, 0, .12, z, g);
+    mesh(rbox(w, h - baseH - .12, d, r), body, 0, .12 + baseH, z, g);
+    mesh(rbox(w - .1, .06, d - .1, Math.max(.02, r - .05)), body, 0, h, z, g);              // Dachkante
+    if (st.trim) B(g, trim, w * .985, .05, .02, 0, .12 + baseH + .03, z + d / 2 + .012);   // Zierleiste über dem Unterbau
   };
   switch (type) {
     case '5ax': {
-      W = 3.0; H = 2.95; D = 2.9;
-      mesh(box(W - .2, .16, D - .2), M.base, 0, .08, 0, g);
-      mesh(rbox(W, .7, D, .32), M.dark, 0, .16, 0, g);
-      mesh(rbox(W, H - .86, D, .32), M.body, 0, .86, 0, g);
-      mesh(box(W * .98, .045, .02), accent, 0, H - .26, D / 2 + .01, g);
-      windowWithInterior(g, -.25, 1.72, D / 2, 1.6, 1.15, 'mill');
-      scr = panel(g, W / 2 - .28, 1.35, D / 2 + .38, -.35, ctl, lang);
-      mesh(box(.7, .9, 1.6), M.body2, -W / 2 - .38, .45, -.3, g);
-      mesh(box(.5, 1.1, .9), M.dark, W / 2 + .3, .55, -.6, g);
+      W = 3.1 * sc; H = 2.95 + (sc - 1) * .5; D = 3.0 + (sc - 1) * .8;
+      enclosure(W, H, D, .3);
+      const dw = Math.min(W * .55, 2.4);
+      doors(g, -W * .12, .82, D / 2, dw, H - 1.25, (H - 1.25) * .62, '5ax', st);
+      // Magazin links, Schaltschrank hinten, Späneförderer rechts
+      mesh(rbox(.9, H * .85, 1.6, .2), body, -W / 2 - .45, 0, -.2, g);
+      B(g, lower, .9, .1, 1.6, -W / 2 - .45, .05, -.2);
+      cabinet(g, 1.3, 2.1, .6, W * .2, -D / 2 - .3, lower);
+      chipConveyor(g, W / 2 + .3, .2, 1.3);
+      scr = controlPanel(g, st.panel, W / 2 - .3, 1.35, D / 2 + .32, -.35, ctl, lang, frame);
       segs = andon(g, W / 2 - .25, H, -D / 2 + .3);
-      plate(H - .14, D / 2, 1.3);
+      brandOn(g, brandText, st.text, -W * .12, H - .22, D / 2 + .012, Math.min(1.4, dw * .6));
+      plate(.45, D / 2, 1.1, -W * .12);
       break;
     }
     case 'hmc': {
-      W = 3.4; H = 3.0; D = 3.6;
-      mesh(box(W - .2, .16, D - .2), M.base, 0, .08, -.3, g);
-      mesh(rbox(W, H - .16, D - 1.0, .14), M.body, 0, .16, -.5, g);
-      mesh(box(W * .98, .05, .02), accent, 0, H - .3, D / 2 - 1.0 + .01, g);
-      windowWithInterior(g, -.35, 1.6, (D - 1.0) / 2 - .5, 1.5, 1.2, 'mill');
-      // Palettenwechsler vor der Maschine
-      mesh(new THREE.CylinderGeometry(.75, .8, .7, 32), M.dark, -.35, 0, 1.45, g).position.y = .35;
-      mesh(box(.62, .08, .62), M.steel, -.35 - .38, .74, 1.45, g); mesh(box(.62, .08, .62), M.steel, -.35 + .38, .74, 1.45, g);
-      mesh(box(.5, .5, .5), M.cavity, -.35 - .38, 1.03, 1.45, g);
-      // Werkzeugmagazin hinten
-      mesh(rbox(1.1, 2.5, 1.3, .06), M.body2, W / 2 + .55, 0, -1.2, g);
-      scr = panel(g, W / 2 - .2, 1.35, (D - 1.0) / 2 - .5 + .4, -.4, ctl, lang);
+      W = 3.4; H = 3.05; D = 3.6;
+      B(g, M.base, W - .2, .12, D - 1.2, 0, .06, -.5);
+      mesh(rbox(W, .8, D - 1.0, .12), lower, 0, .12, -.5, g);
+      mesh(rbox(W, H - .92, D - 1.0, .12), body, 0, .92, -.5, g);
+      if (st.trim) B(g, trim, W * .985, .05, .02, 0, H - .25, (D - 1.0) / 2 - .5 + .012);
+      windowWithInterior(g, -.35, 1.7, (D - 1.0) / 2 - .5, 1.5, 1.2, 'hmc', frame);
+      // Palettenwechsler vor der Maschine mit zwei Paletten und Spanntürmen
+      mesh(cyl(.8, .85, .72, 36), lower, -.35, .36, 1.45, g);
+      for (const s of [-1, 1]) {
+        B(g, M.steel, .62, .08, .62, -.35 + s * .4, .76, 1.45);
+        B(g, M.steelDark, .3, .55, .3, -.35 + s * .4, 1.08, 1.45);
+      }
+      B(g, M.warn, 1.9, .03, .03, -.35, .03, 2.35);
+      // Kettenmagazin hinten, Späneförderer
+      mesh(rbox(1.2, 2.6, 1.4, .08), body, W / 2 + .62, 0, -1.4, g);
+      cabinet(g, 1.4, 2.2, .6, -.6, -D / 2 - .5, lower);
+      chipConveyor(g, -W / 2 - .35, -.6, 1.5);
+      scr = controlPanel(g, st.panel === 'tall' ? 'tall' : 'integrated', W / 2 - .25, 1.2, (D - 1.0) / 2 - .5 + .1, -.3, ctl, lang, frame);
       segs = andon(g, W / 2 - .3, H, -D / 2 + .1);
-      plate(H - .15, (D - 1.0) / 2 - .5, 1.3);
+      brandOn(g, brandText, st.text, -.35, H - .45, (D - 1.0) / 2 - .5 + .012, 1.3);
+      plate(.5, (D - 1.0) / 2 - .5, 1.1, -.35);
+      break;
+    }
+    case 'gantry': {
+      W = 7.6; H = 4.3; D = 4.6;
+      B(g, M.base, W, .2, 2.6, 0, .1, 0);                                       // Maschinenbett
+      B(g, M.steel, W - .6, .14, 2.0, 0, .9, 0);                                // Tisch
+      B(g, lower, W - .4, .7, 2.3, 0, .55, 0);
+      for (const s of [-1, 1]) {
+        mesh(rbox(.8, H - .6, 1.0, .06), body, -1.0, 0, s * 1.65, g);          // Ständer
+        if (st.trim) B(g, trim, .82, .05, .02, -1.0, H - 1.1, s * 1.65 + .51);
+      }
+      mesh(rbox(1.0, .8, 4.3, .06), body, -1.0, H - .8, 0, g);                 // Querbalken (Portal)
+      B(g, lower, .6, 1.4, .6, -1.0, H - 1.5, .3);                              // Fräskopf
+      mesh(cyl(.12, .14, .45), M.steelDark, -1.0, H - 2.35, .3, g);
+      // Schutzwände mit Fenstern rund um den Tisch
+      for (const s of [-1, 1]) {
+        B(g, body, W, 1.6, .06, 0, 1.6, s * 1.45);
+        const gl = new THREE.Mesh(box(W * .7, .8, .012), M.glass); gl.position.set(0, 1.75, s * 1.48); gl.renderOrder = 2; g.add(gl);
+      }
+      cabinet(g, 2.4, 2.2, .7, W / 2 - 1.4, -D / 2 + .1, lower);
+      chipConveyor(g, -W / 2 - .3, 0, 2.0, Math.PI / 2);
+      scr = controlPanel(g, 'pendant', W / 2 - .7, 1.3, 1.9, -.2, ctl, lang, frame);
+      segs = andon(g, W / 2 - .4, 2.4, 1.45);
+      brandOn(g, brandText, st.text, -1.0, H - .4, 2.17, 1.6);
+      plate(1.0, 1.5, 1.2, 1.6);
+      break;
+    }
+    case 'boring': {
+      W = 6.4; H = 4.2; D = 4.8;
+      B(g, M.base, W, .18, 1.6, 0, .09, -1.2);                                   // Ständerbett
+      mesh(rbox(1.3, H - .2, 1.3, .06), body, -1.0, .18, -1.2, g);              // Ständer
+      if (st.trim) B(g, trim, 1.32, .05, .02, -1.0, H - .6, -.54);
+      B(g, lower, .9, .9, 1.6, -1.0, 2.0, -.2);                                  // Spindelkasten
+      const ram = mesh(cyl(.16, .16, .9, 24), M.steelDark, -1.0, 2.0, .9, g); ram.rotation.x = Math.PI / 2;
+      // Drehtisch vor dem Ständer
+      B(g, lower, 2.0, .7, 2.0, 1.0, .35, 1.0);
+      B(g, M.steel, 1.8, .1, 1.8, 1.0, .75, 1.0);
+      B(g, M.steelDark, .7, .6, .5, 1.0, 1.1, 1.0);
+      // Schutzzaun + Bedienerplattform
+      for (const s of [-1, 1]) B(g, M.warn, .04, 1.1, 3.2, 2.4 + s * .02, .55, .6);
+      B(g, M.warn, 4.8, 1.1, .04, .4, .55, 2.25);
+      B(g, M.base, 1.2, .2, .8, -2.4, .1, .9);
+      cabinet(g, 2.0, 2.2, .7, 2.2, -2.0, lower);
+      scr = controlPanel(g, 'pendant', -2.4, 1.35, 1.1, .3, ctl, lang, frame);
+      segs = andon(g, -1.5, H, -.55);
+      brandOn(g, brandText, st.text, -1.0, H - .5, -.53, 1.1);
+      plate(1.2, .22, 1.1, -2.4);
+      break;
+    }
+    case 'vtl': {
+      W = 4.4; H = 4.2; D = 4.0;
+      enclosure(W, H, D, .14, 0, .9);
+      doors(g, -.2, 1.0, D / 2, 2.6, H - 1.7, (H - 1.7) * .66, 'vtl', st);
+      cabinet(g, 1.6, 2.2, .6, .6, -D / 2 - .3, lower);
+      chipConveyor(g, W / 2 + .35, 0, 1.6);
+      scr = controlPanel(g, 'pendant', W / 2 - .3, 1.4, D / 2 + .45, -.25, ctl, lang, frame);
+      segs = andon(g, W / 2 - .25, H, -D / 2 + .3);
+      brandOn(g, brandText, st.text, -.2, H - .3, D / 2 + .012, 1.5);
+      plate(.5, D / 2, 1.2, -.2);
       break;
     }
     case 'lathe': case 'turnmill': {
       const tm = type === 'turnmill';
-      W = tm ? 4.2 : 3.6; H = tm ? 2.7 : 2.05; D = tm ? 2.5 : 2.0;
-      mesh(box(W - .2, .16, D - .2), M.base, 0, .08, 0, g);
-      mesh(rbox(W, .8, D, .1), M.dark, 0, .16, 0, g);
-      mesh(rbox(W, H - .96, D * .82, .1), M.body, 0, .96, -D * .09, g);
-      if (tm) mesh(rbox(1.3, .35, 1.0, .1), M.body2, .5, H, -D * .2, g);
-      // schräges Fenster
-      const fw = new THREE.Group(); fw.position.set(-.2, 1.42, D / 2 - D * .18); fw.rotation.x = -.18; g.add(fw);
-      windowWithInterior(fw, 0, 0, 0, W * .5, H * .38, 'turn');
-      mesh(box(W * .98, .045, .02), accent, 0, H - .12, D / 2 - D * .18 + .01, g);
-      scr = panel(g, W / 2 - .35, 1.3, D / 2 + .1, -.3, ctl, lang);
-      mesh(box(.6, .7, 1.4), M.body2, W / 2 + .32, .35, -.2, g);
+      W = tm ? 4.4 : 3.6; H = tm ? 2.75 : 2.1; D = tm ? 2.5 : 2.0;
+      B(g, M.base, W - .2, .12, D - .2, 0, .06, 0);
+      mesh(rbox(W, .8, D, .1), lower, 0, .12, 0, g);
+      mesh(rbox(W, H - .92, D * .82, .1), body, 0, .92, -D * .09, g);
+      if (tm) mesh(rbox(1.4, .35, 1.1, .1), body, .4, H, -D * .2, g);
+      // schräge Front mit Schiebetür und Fenster
+      const fw = new THREE.Group(); fw.position.set(-.25, .95, D / 2 - D * .18); fw.rotation.x = -.16; g.add(fw);
+      doors(fw, 0, 0, 0, W * .56, H - 1.2, (H - 1.2) * .55, tm ? 'turnmill' : 'turn', st);
+      if (st.trim) B(g, trim, W * .985, .045, .02, 0, H - .12, D / 2 - D * .18 + .012);
+      if (tm) mesh(rbox(1.0, H - .4, 1.1, .1), body, -W / 2 - .5, 0, -.3, g);   // Magazin
+      cabinet(g, 1.0, 1.9, .5, W * .2, -D / 2 - .25, lower);
+      chipConveyor(g, W / 2 + .3, -.1, 1.4);
+      scr = controlPanel(g, st.panel === 'tall' ? 'tall' : 'integrated', W / 2 - .35, 1.25, D / 2 + .08, -.3, ctl, lang, frame);
       segs = andon(g, W / 2 - .25, H, -D / 2 + .3);
-      plate(H - .3, D / 2 - D * .18, 1.2);
+      brandOn(g, brandText, st.text, -.25, H - .3, D / 2 - D * .18 + .015, 1.1);
+      plate(.5, D / 2, 1.0, -.25);
       break;
     }
-    case 'swiss': {
-      W = 2.6; H = 1.85; D = 1.3;
-      mesh(box(W - .1, .14, D - .1), M.base, 0, .07, 0, g);
-      mesh(rbox(W, H - .14, D, .1), M.body, 0, .14, 0, g);
-      windowWithInterior(g, .1, 1.15, D / 2, 1.3, .55, 'turn');
-      mesh(box(W * .98, .04, .02), accent, 0, H - .1, D / 2 + .01, g);
+    case 'swiss': case 'multispindle': {
+      const ms = type === 'multispindle';
+      W = ms ? 5.2 : 2.6; H = ms ? 2.4 : 1.9; D = ms ? 2.3 : 1.35;
+      B(g, M.base, W - .1, .14, D - .1, 0, .07, 0);
+      mesh(rbox(W, H - .14, D, .1), body, 0, .14, 0, g);
+      B(g, lower, W * .99, .6, .02, 0, .45, D / 2 + .011);
+      doors(g, ms ? -.3 : .1, .75, D / 2, ms ? 2.6 : 1.4, H - 1.1, (H - 1.1) * .62, ms ? 'multi' : 'swiss', st);
+      if (st.trim) B(g, trim, W * .98, .04, .02, 0, H - .1, D / 2 + .012);
       // Stangenlader links
-      mesh(rbox(3.2, .5, .55, .08), M.body2, -W / 2 - 1.6, .62, 0, g);
-      for (const x of [-W / 2 - .5, -W / 2 - 2.7]) mesh(box(.12, .62, .4), M.dark, x, .31, 0, g);
-      scr = panel(g, W / 2 - .15, 1.15, D / 2 + .3, -.4, ctl, lang);
+      const lw = ms ? 4.2 : 3.4;
+      mesh(rbox(lw, .55, .6, .08), body, -W / 2 - lw / 2 - .1, .6, 0, g);
+      for (const x of [-W / 2 - .5, -W / 2 - lw + .3]) B(g, lower, .14, .6, .45, x, .3, 0);
+      chipConveyor(g, W / 2 + .3, 0, ms ? 1.6 : 1.0);
+      scr = controlPanel(g, 'integrated', W / 2 - .2, 1.2, D / 2 + .12, -.35, ctl, lang, frame);
       segs = andon(g, W / 2 - .2, H, -D / 2 + .2);
-      plate(H - .26, D / 2, .9);
+      brandOn(g, brandText, st.text, ms ? -.3 : .1, H - .32, D / 2 + .012, ms ? 1.3 : .9);
+      plate(.3, D / 2 + .02, .9, ms ? -.3 : .1);
       break;
     }
-    case 'grinder': {
-      W = 2.4; H = 2.3; D = 2.2;
-      mesh(box(W - .2, .16, D - .2), M.base, 0, .08, 0, g);
-      mesh(rbox(W, 1.0, D, .2), M.dark, 0, .16, 0, g);
-      mesh(rbox(W, H - 1.16, D, .2), M.body, 0, 1.16, 0, g);
-      windowWithInterior(g, -.15, 1.65, D / 2, 1.2, .7, 'grind');
-      mesh(box(W * .98, .04, .02), accent, 0, H - .1, D / 2 + .01, g);
-      scr = panel(g, W / 2 - .1, 1.2, D / 2 + .32, -.4, ctl, lang);
-      segs = andon(g, W / 2 - .2, H, -D / 2 + .25);
-      plate(H - .25, D / 2, 1.0);
+    case 'grinder': case 'gear': {
+      const gr = type === 'gear';
+      W = gr ? 3.8 : 2.5; H = gr ? 2.7 : 2.3; D = gr ? 2.8 : 2.2;
+      enclosure(W, H, D, .22, 0, 1.0);
+      // schräges, großes Fenster oben
+      const fw = new THREE.Group(); fw.position.set(gr ? -.3 : -.15, 1.7, D / 2 - .05); fw.rotation.x = -.22; g.add(fw);
+      windowWithInterior(fw, 0, 0, 0, gr ? 1.6 : 1.25, gr ? 1.1 : .75, gr ? 'gear' : 'grind', frame);
+      B(g, paint(st.door), gr ? 1.8 : 1.5, .9, .05, gr ? -.3 : -.15, .75, D / 2 + .025);
+      if (gr) mesh(rbox(1.2, H + .3, 1.2, .1), body, W / 2 - .5, 0, -D / 2 + .5, g);     // hoher Ständer mit Fräskopf
+      cabinet(g, 1.0, 2.0, .55, 0, -D / 2 - .28, lower);
+      if (gr) chipConveyor(g, -W / 2 - .3, 0, 1.4);
+      scr = controlPanel(g, 'integrated', W / 2 - .15, 1.25, D / 2 + .1, -.35, ctl, lang, frame);
+      segs = andon(g, W / 2 - .2, gr ? H + .3 : H, -D / 2 + .25);
+      brandOn(g, brandText, st.text, gr ? -.3 : -.15, H - .14, D / 2 + .012, .9);
+      plate(.35, D / 2, 1.0, gr ? -.3 : -.15);
       break;
     }
-    default: {    // vmc + sonstige
-      W = 2.7; H = 2.65; D = 2.4;
-      mesh(box(W - .2, .16, D - .2), M.base, 0, .08, 0, g);
-      mesh(rbox(W, .75, D, .1), M.dark, 0, .16, 0, g);
-      mesh(rbox(W, H - .91, D, .1), M.body, 0, .91, 0, g);
-      mesh(box(W * .98, .045, .02), accent, 0, H - .22, D / 2 + .01, g);
-      windowWithInterior(g, -.3, 1.6, D / 2, 1.3, 1.0, 'mill');
-      scr = panel(g, W / 2 - .2, 1.3, D / 2 + .35, -.35, ctl, lang);
-      mesh(box(.55, .75, 1.5), M.body2, W / 2 + .3, .375, -.3, g);
+    default: {    // Vertikal-Bearbeitungszentrum + sonstige
+      W = 2.7 * sc; H = 2.65 + (sc - 1) * .4; D = 2.4 + (sc - 1) * .6;
+      enclosure(W, H, D, .1, 0, .75);
+      const dw = Math.min(W * .62, 2.6);
+      doors(g, -W * .08, .87, D / 2, dw, H - 1.2, (H - 1.2) * .6, 'mill', st);
+      magazineDrum(g, -W / 2 - .3, .95, -.35, .42, H - 1.1, body);
+      cabinet(g, 1.0, 2.0, .55, W * .15, -D / 2 - .28, lower);
+      chipConveyor(g, W / 2 + .3, -.1, 1.2);
+      scr = controlPanel(g, st.panel, W / 2 - .2, 1.3, D / 2 + .3, -.35, ctl, lang, frame);
       segs = andon(g, W / 2 - .25, H, -D / 2 + .3);
-      plate(H - .12, D / 2, 1.1);
+      brandOn(g, brandText, st.text, -W * .08, H - .17, D / 2 + .012, Math.min(1.1, dw * .5));
+      plate(.45, D / 2, 1.0, -W * .08);
     }
   }
   g.userData = { type, andon: segs, screen: scr, ctl, lang, W, H, D };

@@ -1,8 +1,10 @@
 {
 "autolock": 0.844,
+"coralogistic": 1.8618,
 "coramachineload": 1.7534,
 "corameasure-lg": 1.6759,
 "genius": 0.7945,
+"hobcheck": 1.2736,
 "hyperion": 1.249,
 "idchip": 0.4804,
 "keeper": 1.3179,
@@ -26,6 +28,9 @@
 "zcam-integration": 1.0,
 "zconnectivity": 1.0,
 "zidcode": 1.0623,
+"zintegration": 1.0,
+"zresources": 1.0,
 "zshopfloor": 1.0,
+"zstock": 1.0,
 "ztower": 1.4047
 }

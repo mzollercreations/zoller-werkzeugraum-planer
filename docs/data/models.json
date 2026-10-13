@@ -26,7 +26,14 @@
    "whitealu",
    "whiteplastic",
    "yellow"
-  ]
+  ],
+  "ar": {
+   "file": "ar/venturion.usdc",
+   "tex": [
+    "ar/tex/screen_pilot4_measure.png"
+   ],
+   "tris": 48768
+  }
  },
  "zidcode": {
   "id": "zidcode",
@@ -37,7 +44,7 @@
    1.422,
    0.489
   ],
-  "tris": 59407,
+  "tris": 59375,
   "classes": [
    "blackoxide",
    "blackplastic",
@@ -46,7 +53,14 @@
    "screen",
    "whitealu",
    "yellow"
-  ]
+  ],
+  "ar": {
+   "file": "ar/zidcode.usdc",
+   "tex": [
+    "ar/tex/screen_zid_scan.png"
+   ],
+   "tris": 26762
+  }
  },
  "venturion600": {
   "id": "venturion600",
@@ -75,7 +89,14 @@
    "whitealu",
    "whiteplastic",
    "yellow"
-  ]
+  ],
+  "ar": {
+   "file": "ar/venturion600.usdc",
+   "tex": [
+    "ar/tex/screen_pilot4_measure.png"
+   ],
+   "tris": 49202
+  }
  },
  "venturion800": {
   "id": "venturion800",
@@ -104,7 +125,14 @@
    "whitealu",
    "whiteplastic",
    "yellow"
-  ]
+  ],
+  "ar": {
+   "file": "ar/venturion800.usdc",
+   "tex": [
+    "ar/tex/screen_pilot4_measure.png"
+   ],
+   "tris": 49798
+  }
  },
  "smile": {
   "id": "smile",
@@ -134,7 +162,14 @@
    "whiteplastic",
    "yellow",
    "zinc"
-  ]
+  ],
+  "ar": {
+   "file": "ar/smile.usdc",
+   "tex": [
+    "ar/tex/screen_pilot4_contour.png"
+   ],
+   "tris": 48270
+  }
  },
  "keeper": {
   "id": "keeper",
@@ -145,17 +180,24 @@
    2.1,
    1.507
   ],
-  "tris": 155872,
+  "tris": 79654,
   "classes": [
    "anodized",
    "blackplastic",
    "blue",
    "darkgrey",
    "pa6",
+   "screen",
    "whitealu",
-   "whiteplastic",
    "yellow"
-  ]
+  ],
+  "ar": {
+   "file": "ar/keeper.usdc",
+   "tex": [
+    "ar/tex/screen_tms_keeper.png"
+   ],
+   "tris": 101084
+  }
  },
  "toolorganizer": {
   "id": "toolorganizer",
@@ -166,7 +208,7 @@
    1.731,
    0.789
   ],
-  "tris": 76308,
+  "tris": 76090,
   "classes": [
    "anodized",
    "blackplastic",
@@ -174,7 +216,14 @@
    "screen",
    "steel",
    "whitealu"
-  ]
+  ],
+  "ar": {
+   "file": "ar/toolorganizer.usdc",
+   "tex": [
+    "ar/tex/screen_tms_organizer.png"
+   ],
+   "tris": 103714
+  }
  },
  "toolstation": {
   "id": "toolstation",
@@ -185,7 +234,7 @@
    2.097,
    0.862
   ],
-  "tris": 134941,
+  "tris": 134921,
   "classes": [
    "anodized",
    "blackplastic",
@@ -197,7 +246,14 @@
    "wood",
    "worktop",
    "yellow"
-  ]
+  ],
+  "ar": {
+   "file": "ar/toolstation.usdc",
+   "tex": [
+    "ar/tex/screen_tms_station.png"
+   ],
+   "tris": 149260
+  }
  },
  "redomatic600": {
   "id": "redomatic600",
@@ -208,7 +264,7 @@
    1.971,
    1.906
   ],
-  "tris": 91180,
+  "tris": 90932,
   "classes": [
    "anodized",
    "bellows",
@@ -219,6 +275,7 @@
    "chrome",
    "darkgrey",
    "glossblack",
+   "led",
    "paper",
    "red",
    "screen",
@@ -229,7 +286,14 @@
    "worktop",
    "yellow",
    "zinc"
-  ]
+  ],
+  "ar": {
+   "file": "ar/redomatic600.usdc",
+   "tex": [
+    "ar/tex/screen_pilot4_measure.png"
+   ],
+   "tris": 96772
+  }
  },
  "powershrink400": {
   "id": "powershrink400",
@@ -240,20 +304,26 @@
    1.757,
    0.644
   ],
-  "tris": 47087,
+  "tris": 47085,
   "classes": [
    "anodized",
    "bellows",
    "blackplastic",
    "darkgrey",
    "glossblack",
+   "led",
    "red",
    "steel",
    "whitealu",
    "whiteplastic",
    "worktop",
    "yellow"
-  ]
+  ],
+  "ar": {
+   "file": "ar/powershrink400.usdc",
+   "tex": [],
+   "tris": 41634
+  }
  },
  "toolbalancer": {
   "id": "toolbalancer",
@@ -264,7 +334,7 @@
    1.726,
    2.016
   ],
-  "tris": 80980,
+  "tris": 80242,
   "classes": [
    "bellows",
    "blackplastic",
@@ -282,7 +352,14 @@
    "wood",
    "yellow",
    "zinc"
-  ]
+  ],
+  "ar": {
+   "file": "ar/toolbalancer.usdc",
+   "tex": [
+    "ar/tex/screen_pilot4_contour.png"
+   ],
+   "tris": 68248
+  }
  },
  "zidcode_lo": {
   "id": "zidcode_lo",
@@ -293,7 +370,7 @@
    1.422,
    0.489
   ],
-  "tris": 1030,
+  "tris": 13381,
   "classes": [
    "blackoxide",
    "blackplastic",

@@ -36,12 +36,25 @@ DEVICES = {
     "redomatic600":   ("XXXXXXX_752865_ZOLLER »redomatic 600«.glb", "screen_pilot4_measure.png", 90000),
     "powershrink400": ("XXXXXXX_752398_ZOLLER »powerShrink 400«.glb", "screen_pilot4_contour.png", 52000),
     "toolbalancer":   ("XXXXXXX_720749_ZOLLER »toolBalancer«.glb", "screen_pilot4_contour.png", 80000),
-    # leichte Fassung für die Stationen an jeder Maschine (bis zu 60 Stück in einer Halle)
-    "zidcode_lo":     ("XXXXXXX_717076_ZOLLER »zidCode«.glb", "screen_zid_scan.png", 5000),
+    # leichte Fassung für die Stationen an jeder Maschine (bis zu 60 Stück in einer Halle, ab ~12 m Abstand)
+    "zidcode_lo":     ("XXXXXXX_717076_ZOLLER »zidCode«.glb", "screen_zid_scan.png", 9000),
 }
 # zidCode: Display teilt sich das Material mit dem Gehäuse -> nur große, nach vorn oben zeigende Flächen sind Bildschirm
 SCREEN_FACES = {"zidcode": dict(mat="plastik-schwarz", normal=(0, .41, .91), ymin=.8)}
 SCREEN_FACES["zidcode_lo"] = SCREEN_FACES["zidcode"]
+# »keeper«: der Monitor ist ein Material ohne Namen in reinem Weiß (2 Dreiecke) -> Bildschirm
+SCREEN_WHITE = {"keeper"}
+SCREEN_LIFT = .0015          # Bildschirm 1,5 mm vor das Gehäuse, sonst flackert er mit der Monitorfront (z-fighting)
+# Innenteile, die bei geschlossenem Gerät nie zu sehen sind (»keeper«: Werkzeugeinsätze hinter den Auszügen = 91 % der
+# Dreiecke) -> weglassen: Bauteile, deren Hüllquader ganz im Hüllquader eines großen Teils liegt (Abstand in m)
+INTERIOR_DROP = {"keeper": .012}
+KEEP_FACES, KEEP_SIZE = 300, .2      # Teile mit höchstens so vielen Dreiecken und mindestens dieser Größe (m) bleiben unvereinfacht
+# AR (iPhone/iPad Quick Look): eigene, leichtere Fassung je Gerät als USDC, Dreiecks-Budget
+AR_BUDGET = {"keeper": 50000, "toolstation": 34000, "toolorganizer": 16000, "zidcode": 9000, "redomatic600": 34000,
+             "toolbalancer": 26000, "powershrink400": 22000}
+AR_DEFAULT = 24000
+AR_LO = {"zidcode", "toolstation", "toolorganizer"}      # bei diesen Geräten dürfen auch Ränder vereinfacht werden
+AR_OUT = os.path.join(ROOT, "docs", "ar")
 
 _REF = [
     ((0.0346, 0.0386, 0.0409), "darkgrey"), ((0.3985, 0.4005, 0.3943), "whitealu"), ((0.9529, 0.8941, 0.0), "yellow"),
@@ -53,7 +66,7 @@ _REF = [
     ((0.2295, 0.2828, 0.3083), "zinc"), ((1.0, 0.0252, 0.0121), "red"), ((0.2403, 0.2480, 0.2442), "chrome"),
     ((0.0, 0.7172, 0.5498), "teal"), ((0.0, 0.0081, 0.81), "blue"), ((0.0, 0.0, 0.0), "glossblack"),
 ]
-_NAMES = [("gelb", "yellow"), ("monitor", "screen"), ("faltenbalg", "bellows"), ("messing", "brass"), ("brueniert", "blackoxide"),
+_NAMES = [("led-gruen", "led"), ("gelb", "yellow"), ("monitor", "screen"), ("faltenbalg", "bellows"), ("messing", "brass"), ("brueniert", "blackoxide"),
           ("alu-eloxiert", "steel"), ("eloxiert", "anodized"), ("verzinkt", "zinc"), ("rot", "red"), ("papier", "paper"),
           ("plastik-weiss", "whiteplastic"), ("weissaluminium", "whitealu"), ("schwarzgrau", "darkgrey"),
           ("schwarz lackiert", "glossblack"), ("plastik-schwarz", "blackplastic"), ("pa 6", "pa6"), ("st_12", "steel")]
@@ -61,7 +74,8 @@ _NAMES = [("gelb", "yellow"), ("monitor", "screen"), ("faltenbalg", "bellows"), 
 FALLBACK = dict(darkgrey="#35383b", whitealu="#a9acab", yellow="#f0dc00", blackplastic="#141516", pa6="#111317",
                 anodized="#1e2124", steel="#b9bdc0", whiteplastic="#e6e4dc", paper="#e0ded6", wood="#c8a679",
                 worktop="#232426", bellows="#18191b", blackoxide="#2a2826", brass="#c9a14a", glossblack="#0d0e10",
-                zinc="#9da6ab", red="#c8140f", chrome="#9a9e9c", teal="#1fa58a", blue="#1a3fae", screen="#050506")
+                zinc="#9da6ab", red="#c8140f", chrome="#9a9e9c", teal="#1fa58a", blue="#1a3fae", screen="#050506",
+                led="#3ccf6a")
 
 
 def classify(mat):
@@ -215,11 +229,32 @@ def simplify(v, f, target, border=True):
     return np.asarray(nv, dtype=np.float64), np.asarray(nf, dtype=np.int64)
 
 
-def build(dev):
-    file, screen_img, budget = DEVICES[dev]
-    t0 = time.time()
-    parts = read_parts(os.path.join(CAD, "original", file))
+_PARTS = {}
+
+
+def drop_interior(parts, margin):
+    boxes = [(p[np.unique(f)].min(0) * .001, p[np.unique(f)].max(0) * .001) for _, p, f, _ in parts]
+    big = [i for i, (a, b) in enumerate(boxes) if np.linalg.norm(b - a) > .8]
+    keep = []
+    for i, part in enumerate(parts):
+        a, b = boxes[i]
+        if any(j != i and np.all(a > boxes[j][0] + margin) and np.all(b < boxes[j][1] - margin) for j in big):
+            continue
+        keep.append(part)
+    return keep
+
+
+def collect(dev, budget, lo=False):
+    """Primitive je Materialklasse (Meter, Gerät auf y=0, Front +Z) mit höchstens `budget` Dreiecken + Monitorflächen.
+    lo: Ränder dürfen mitvereinfacht werden (für die Fernansicht). Liefert (prims, size, CAD-Dreiecke)."""
+    file = DEVICES[dev][0]
+    if file not in _PARTS:
+        _PARTS[file] = read_parts(os.path.join(CAD, "original", file))
+    parts = _PARTS[file]
     allp = np.vstack([p[1] for p in parts]) * .001
+    base = dev.replace("_lo", "")
+    if base in INTERIOR_DROP:
+        parts = drop_interior(parts, INTERIOR_DROP[base])
     mn, mx = allp.min(0), allp.max(0)
     off = np.array([-(mn[0] + mx[0]) / 2, -mn[1], -(mn[2] + mx[2]) / 2])
     size = mx - mn
@@ -229,6 +264,9 @@ def build(dev):
     for mat, pts, fc, node in parts:
         p = pts * .001 + off
         c = classify(mat)
+        if dev in SCREEN_WHITE and mat is not None and mat.name is None and mat.pbrMetallicRoughness \
+                and min(mat.pbrMetallicRoughness.baseColorFactor[:3]) > .99:
+            c = "screen"
         if sf and mat is not None and sf["mat"] in (mat.name or "").lower():
             fnrm, _ = face_normals(p, fc)
             cen = p[fc].mean(1)
@@ -239,16 +277,31 @@ def build(dev):
         if c == "screen":
             screens.append((p, fc))
             continue
-        groups.setdefault(c, []).append((p, fc))
-    tri_total = sum(len(f) for g in groups.values() for _, f in g)
+        # einfache, große Teile (Gehäusekästen, Platten) nicht vereinfachen – sonst fallen sie bei kleinem Budget ganz weg
+        keep = len(fc) <= KEEP_FACES and np.linalg.norm(np.ptp(p, 0)) >= KEEP_SIZE
+        groups.setdefault(c, []).append((p, fc, keep))
+    kept = sum(len(f) for g in groups.values() for _, f, k in g if k)
+    tri_total = sum(len(f) for g in groups.values() for _, f, k in g if not k)
+    budget = max(budget - kept, budget // 2)
     prims = []
-    for c, lst in sorted(groups.items(), key=lambda kv: -sum(len(f) for _, f in kv[1])):
-        offs = np.cumsum([0] + [len(p) for p, _ in lst])
-        v = np.vstack([p for p, _ in lst]); f = np.vstack([fc + o for (_, fc), o in zip(lst, offs)])
-        lo = dev.endswith('_lo')
-        v, f = weld(v, f, eps=.0025 if lo else 5e-5)    # leichte Fassung: Punkte auf 2,5-mm-Raster zusammenlegen
-        tgt = max(60 if lo else 400, budget * len(f) / max(tri_total, 1)) if tri_total > budget else len(f)
-        v, f = simplify(v, f, tgt, border=not lo)
+
+    def merge(lst):
+        offs = np.cumsum([0] + [len(p) for p, _, _ in lst])
+        return np.vstack([p for p, _, _ in lst]), np.vstack([fc + o for (_, fc, _), o in zip(lst, offs)])
+
+    for c, lst in sorted(groups.items(), key=lambda kv: -sum(len(x[1]) for x in kv[1])):
+        rest, hold = [x for x in lst if not x[2]], [x for x in lst if x[2]]
+        vs, fs = [], []
+        if rest:
+            v, f = merge(rest)
+            v, f = weld(v, f, eps=.0004 if lo else 5e-5)
+            tgt = max(120, budget * len(f) / max(tri_total, 1)) if tri_total > budget else len(f)
+            v, f = simplify(v, f, tgt, border=not lo)
+            vs.append(v); fs.append(f)
+        if hold:
+            v, f = merge(hold); vs.append(v); fs.append(f)
+        offs = np.cumsum([0] + [len(v) for v in vs])
+        v = np.vstack(vs); f = np.vstack([f + o for f, o in zip(fs, offs)])
         v, f = weld(v, f)
         pv, pn, pf = creased(v, f)
         prims.append(dict(cls=c, pos=pv, nrm=pn, idx=pf))
@@ -261,14 +314,135 @@ def build(dev):
         n = (fn * fa[:, None]).sum(0); n /= max(np.linalg.norm(n), 1e-12)
         if n[2] < 0:
             n = -n
+        v = v + n * SCREEN_LIFT
         prims.append(dict(cls="screen", pos=v, nrm=np.tile(n, (len(v), 1)), idx=f, uv=uv))
+    return prims, size, sum(len(f) for _, _, f, _ in parts)
+
+
+def build(dev):
+    file, screen_img, budget = DEVICES[dev]
+    t0 = time.time()
+    prims, size, cad_tris = collect(dev, budget, lo=dev.endswith("_lo"))
     write_glb(os.path.join(OUT, dev + ".glb"), prims)
     tris = sum(len(p["idx"]) for p in prims)
-    print(f"{dev:15s} {sum(len(f) for _, _, f, _ in parts):>8d} -> {tris:>7d} Dreiecke, {len(prims):2d} Materialien, "
+    print(f"{dev:15s} {cad_tris:>8d} -> {tris:>7d} Dreiecke, {len(prims):2d} Materialien, "
           f"{os.path.getsize(os.path.join(OUT, dev + '.glb')) / 1024:7.0f} KB, {size[0]:.2f}×{size[2]:.2f}×{size[1]:.2f} m  ({time.time() - t0:.1f}s)")
-    return dict(id=dev, file=f"models/{dev}.glb", screen=f"models/tex/{os.path.splitext(screen_img)[0]}.webp",
-                size=[round(float(size[0]), 3), round(float(size[1]), 3), round(float(size[2]), 3)], tris=int(tris),
-                classes=sorted({p["cls"] for p in prims}))
+    man = dict(id=dev, file=f"models/{dev}.glb", screen=f"models/tex/{os.path.splitext(screen_img)[0]}.webp",
+               size=[round(float(size[0]), 3), round(float(size[1]), 3), round(float(size[2]), 3)], tris=int(tris),
+               classes=sorted({p["cls"] for p in prims}))
+    if not dev.endswith("_lo"):
+        man["ar"] = build_ar(dev)
+    return man
+
+
+# ------------------------------------------------------------------ AR (USDC für AR Quick Look)
+# Materialien wie CLS in docs/assets/js/scene.js (sRGB-Farbe, Rauheit, Metall, Klarlack)
+AR_MAT = dict(
+    darkgrey=("#35383b", .42, 0, .15), whitealu=("#a9acab", .34, .72, .35), yellow=("#f0dc00", .3, 0, .6),
+    blackplastic=("#141516", .45, 0, 0), pa6=("#111317", .55, 0, 0), anodized=("#1e2124", .32, .85, 0),
+    steel=("#b9bdc0", .3, 1, 0), whiteplastic=("#e6e4dc", .35, 0, .2), paper=("#e0ded6", .6, 0, 0),
+    wood=("#c8a679", .5, 0, 0), worktop=("#232426", .55, 0, 0), bellows=("#18191b", .78, 0, 0),
+    blackoxide=("#2a2826", .35, .9, 0), brass=("#c9a14a", .25, 1, 0), glossblack=("#0d0e10", .16, 0, 1),
+    zinc=("#9da6ab", .33, 1, 0), red=("#c8140f", .3, 0, .5), chrome=("#9a9e9c", .12, .95, 0),
+    teal=("#1fa58a", .4, 0, 0), blue=("#1a3fae", .35, 0, .4), led=("#3ccf6a", .3, 0, 0),
+)
+
+
+def _lin(h):
+    h = h.lstrip("#")
+    return tuple(((int(h[i:i + 2], 16) / 255 + .055) / 1.055) ** 2.4 if int(h[i:i + 2], 16) / 255 > .04045
+                 else int(h[i:i + 2], 16) / 255 / 12.92 for i in (0, 2, 4))
+
+
+def build_ar(dev):
+    """docs/ar/<id>.usdc: Gerät für AR Quick Look. CAD-Flächen sind nicht einheitlich orientiert und Quick Look zeichnet
+    nur Vorderseiten -> jede Fläche zusätzlich mit umgekehrter Windung (Normale gespiegelt). Bildschirme als Leuchtbild."""
+    from pxr import Usd, UsdGeom, UsdShade, Sdf, Gf, Vt, Kind
+    os.makedirs(os.path.join(AR_OUT, "tex"), exist_ok=True)
+    prims, size, _ = collect(dev, AR_BUDGET.get(dev, AR_DEFAULT), lo=dev in AR_LO)
+    if PREVIEW:
+        write_glb(os.path.join(ROOT, "docs", "_test", dev + "_ar.glb"), prims)
+    path = os.path.join(AR_OUT, dev + ".usdc")
+    if os.path.exists(path):
+        os.remove(path)
+    st = Usd.Stage.CreateNew(path)
+    UsdGeom.SetStageUpAxis(st, UsdGeom.Tokens.y)
+    UsdGeom.SetStageMetersPerUnit(st, 1.0)
+    root = UsdGeom.Xform.Define(st, "/Device")
+    st.SetDefaultPrim(root.GetPrim())
+    Usd.ModelAPI(root.GetPrim()).SetKind(Kind.Tokens.component)
+    UsdGeom.Scope.Define(st, "/Device/Materials")
+    screen_png = None
+    mats = {}
+
+    def material(c):
+        if c in mats:
+            return mats[c]
+        m = UsdShade.Material.Define(st, f"/Device/Materials/{c}")
+        sh = UsdShade.Shader.Define(st, f"/Device/Materials/{c}/Surface")
+        sh.CreateIdAttr("UsdPreviewSurface")
+        if c == "screen":
+            nonlocal screen_png
+            img = DEVICES[dev][1]
+            screen_png = "screen_" + os.path.splitext(img)[0].replace("screen_", "") + ".png"
+            im = Image.open(os.path.join(CAD, "textures", img)).convert("RGB")
+            im.thumbnail((1024, 1024), Image.LANCZOS)
+            im.save(os.path.join(AR_OUT, "tex", screen_png), optimize=True)
+            st_r = UsdShade.Shader.Define(st, f"/Device/Materials/{c}/st")
+            st_r.CreateIdAttr("UsdPrimvarReader_float2")
+            st_r.CreateInput("varname", Sdf.ValueTypeNames.String).Set("st")
+            tx = UsdShade.Shader.Define(st, f"/Device/Materials/{c}/tex")
+            tx.CreateIdAttr("UsdUVTexture")
+            tx.CreateInput("file", Sdf.ValueTypeNames.Asset).Set(f"tex/{screen_png}")
+            tx.CreateInput("st", Sdf.ValueTypeNames.Float2).ConnectToSource(st_r.ConnectableAPI(), "result")
+            tx.CreateInput("wrapS", Sdf.ValueTypeNames.Token).Set("clamp")
+            tx.CreateInput("wrapT", Sdf.ValueTypeNames.Token).Set("clamp")
+            tx.CreateOutput("rgb", Sdf.ValueTypeNames.Float3)
+            sh.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(.01, .01, .012))
+            sh.CreateInput("emissiveColor", Sdf.ValueTypeNames.Color3f).ConnectToSource(tx.ConnectableAPI(), "rgb")
+            sh.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(.15)
+            sh.CreateInput("metallic", Sdf.ValueTypeNames.Float).Set(0.0)
+        else:
+            col, rough, metal, coat = AR_MAT.get(c, AR_MAT["darkgrey"])
+            sh.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(*_lin(col)))
+            sh.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(float(rough))
+            sh.CreateInput("metallic", Sdf.ValueTypeNames.Float).Set(float(metal))
+            if c == "led":
+                sh.CreateInput("emissiveColor", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(.12, .9, .32))
+            if coat:
+                sh.CreateInput("clearcoat", Sdf.ValueTypeNames.Float).Set(float(coat))
+                sh.CreateInput("clearcoatRoughness", Sdf.ValueTypeNames.Float).Set(.1)
+        m.CreateSurfaceOutput().ConnectToSource(sh.ConnectableAPI(), "surface")
+        mats[c] = m
+        return m
+
+    tris = 0
+    for i, p in enumerate(prims):
+        v, n, f = p["pos"], p["nrm"], p["idx"]
+        nv = len(v)
+        # zweiseitig: Kopie mit umgekehrter Windung und gespiegelter Normale
+        V = np.vstack([v, v]).astype(np.float32)
+        N = np.vstack([n, -n]).astype(np.float32)
+        F = np.vstack([f, f[:, ::-1] + nv]).astype(np.int32)
+        mesh = UsdGeom.Mesh.Define(st, f"/Device/{p['cls']}_{i}")
+        mesh.CreatePointsAttr(Vt.Vec3fArray.FromNumpy(V))
+        mesh.CreateNormalsAttr(Vt.Vec3fArray.FromNumpy(N))
+        mesh.SetNormalsInterpolation(UsdGeom.Tokens.vertex)
+        mesh.CreateFaceVertexCountsAttr(Vt.IntArray.FromNumpy(np.full(len(F), 3, np.int32)))
+        mesh.CreateFaceVertexIndicesAttr(Vt.IntArray.FromNumpy(F.reshape(-1)))
+        mesh.CreateSubdivisionSchemeAttr(UsdGeom.Tokens.none)
+        mesh.CreateDoubleSidedAttr(False)
+        mesh.CreateExtentAttr(Vt.Vec3fArray([Gf.Vec3f(*V.min(0).tolist()), Gf.Vec3f(*V.max(0).tolist())]))
+        if p.get("uv") is not None:
+            uv = np.vstack([p["uv"], p["uv"]]).astype(np.float32)
+            pv = UsdGeom.PrimvarsAPI(mesh).CreatePrimvar("st", Sdf.ValueTypeNames.TexCoord2fArray, UsdGeom.Tokens.vertex)
+            pv.Set(Vt.Vec2fArray.FromNumpy(uv))
+        UsdShade.MaterialBindingAPI.Apply(mesh.GetPrim()).Bind(material(p["cls"]))
+        tris += len(F)
+    st.GetRootLayer().Save()
+    kb = os.path.getsize(path) / 1024
+    print(f"   AR {dev:13s} {tris:>7d} Dreiecke (zweiseitig), {kb:6.0f} KB" + (f", Bildschirm {screen_png}" if screen_png else ""))
+    return dict(file=f"ar/{dev}.usdc", tex=[f"ar/tex/{screen_png}"] if screen_png else [], tris=int(tris))
 
 
 def write_glb(path, prims):
@@ -329,7 +503,7 @@ def write_glb(path, prims):
 
 def textures():
     os.makedirs(os.path.join(OUT, "tex"), exist_ok=True)
-    for f in sorted({d[1] for d in DEVICES.values()}):
+    for f in sorted({d[1] for d in DEVICES.values()} | {"screen_zid_data.png"}):
         im = Image.open(os.path.join(CAD, "textures", f)).convert("RGB")
         im.thumbnail((1024, 1024), Image.LANCZOS)
         im.save(os.path.join(OUT, "tex", os.path.splitext(f)[0] + ".webp"), quality=86, method=6)
@@ -341,9 +515,11 @@ def textures():
             im.save(os.path.join(rd, dev + ".webp"), quality=82, method=6)
 
 
+PREVIEW = "--preview" in sys.argv     # AR-Fassungen zusätzlich als GLB nach docs/_test (zum Ansehen)
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    ids = sys.argv[1:] or list(DEVICES)
+    ids = [a for a in sys.argv[1:] if not a.startswith("--")] or list(DEVICES)
     man_path = os.path.join(ROOT, "docs", "data", "models.json")
     man = json.load(open(man_path)) if os.path.exists(man_path) else {}
     for d in ids:
