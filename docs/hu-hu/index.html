@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="hu-HU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Toolroom Planner | ZOLLER</title>
+<meta name="description" content="Describe your production – the ZOLLER Toolroom Planner puts your machines into a 3D hall, plans the matching toolroom from real CAD data and calculates what you gain.">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="assets/img/favicon.ico">
+<link rel="preload" href="assets/fonts/T-Star-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/T-Star-Bold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/app.css?v=3764867204">
+<script type="importmap">{ "imports": { "three": "./assets/vendor/three.module.min.js" } }</script>
+<base href="../">
+<script>window.PLANER = {"lang":"en","locale":"hu-HU","base":"","site":"hu","country":"Magyarország","siteUrl":"https://mzollercreations.github.io/zoller-hungary/","showroom":"https://mzollercreations.github.io/zoller-produktumgebung-3d/hu-hu/","planer":"https://mzollercreations.github.io/zoller-werkzeugraum-planer/hu-hu/","mail":"office@zoller-a.at","company":"ZOLLER Austria GmbH","expert":"https://myzoller.com/int/en/expert/booking/","currency":"HUF","fx":395,"langs":["en"],"locales":{"en":"hu-hu/"},"links":{"smile":"https://mzollercreations.github.io/zoller-hungary/termekek/beallitas-es-meres/fueggoleges-keszuelekek/smile/","venturion":"https://mzollercreations.github.io/zoller-hungary/termekek/beallitas-es-meres/fueggoleges-keszuelekek/venturion/","venturion600":"https://mzollercreations.github.io/zoller-hungary/termekek/beallitas-es-meres/fueggoleges-keszuelekek/venturion/","venturion800":"https://mzollercreations.github.io/zoller-hungary/termekek/beallitas-es-meres/fueggoleges-keszuelekek/venturion/","hyperion":"https://mzollercreations.github.io/zoller-hungary/termekek/beallitas-es-meres/vizszintes-gepek/hyperion/","redomatic":"https://mzollercreations.github.io/zoller-hungary/termekek/hore-zsugorodo-technika/redomatic/","powershrink":"https://mzollercreations.github.io/zoller-hungary/termekek/hore-zsugorodo-technika/powershrink/modellek/powershrink-400/","toolbalancer":"https://mzollercreations.github.io/zoller-hungary/termekek/kiegyensulyozasi-technika/toolbalancer/","keeper":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/szerszamraktar/keeper/","toolorganizer":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/szerszamraktar/toolorganizer/","twister":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/szerszamraktar/twister/","autolock":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/szerszamraktar/autolock/","toolstation":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/szerszamok-oesszeszerelese/toolstation/","ztower":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/szerszamok-oesszeszerelese/ztower/","zidcode":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/adatatvitel/zidcode/","zidcode40":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/adatatvitel/zidcode/zidcode-40/","idchip":"https://mzollercreations.github.io/zoller-hungary/termekek/szerszamtartok/idchip/","toolcart":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/szerszamok-szallitasa/toolcart/","loadbox":"https://mzollercreations.github.io/zoller-hungary/termekek/automatizalas/szerszamok-biztositasa/loadbox/","coramachineload":"https://mzollercreations.github.io/zoller-hungary/termekek/automatizalas/szerszamlogisztika/coramachineload/","robobox":"https://mzollercreations.github.io/zoller-hungary/termekek/automatizalas/szerszamok-elokeszitese/robobox/","roboset-2":"https://mzollercreations.github.io/zoller-hungary/termekek/automatizalas/szerszamellenorzes/roboset-2/","genius":"https://mzollercreations.github.io/zoller-hungary/termekek/ellenorzes-es-meres/univerzalis-merogepek/genius/","smartcheck":"https://mzollercreations.github.io/zoller-hungary/termekek/ellenorzes-es-meres/univerzalis-merogepek/smartcheck/","tms-starter":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/tms-tool-management-solutions/szoftvercsomagok/starter-raktarkezeles/","tms-silver":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/tms-tool-management-solutions/szoftvercsomagok/silver-mukoedesi-szervezet/","tms-gold":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/tms-tool-management-solutions/szoftvercsomagok/gold-muehelyiranyitas/","zshopfloor":"https://mzollercreations.github.io/zoller-webseite/en/software/add-on-shopfloor/","zcam":"https://mzollercreations.github.io/zoller-webseite/en/software/add-on-zcam-integration/","zconnectivity":"https://mzollercreations.github.io/zoller-webseite/en/software/add-on-zconnectivity/"},"factLinks":{"calc15k":"https://mzollercreations.github.io/zoller-hungary/gazdasagossagi-kalkulator/","min452":"https://mzollercreations.github.io/zoller-hungary/gazdasagossagi-kalkulator/","setup40":"https://mzollercreations.github.io/zoller-hungary/megoldasok/beallitas-es-meres/","tms5":"https://mzollercreations.github.io/zoller-hungary/gazdasagossagi-kalkulator/","tool20":"https://mzollercreations.github.io/zoller-hungary/gazdasagossagi-kalkulator/","lauble":"https://mzollercreations.github.io/zoller-webseite/en/company/reports-stories/details/mit-dem-team-boxenstopp-zum-perfekten-ergebnis/","ituwa":"https://mzollercreations.github.io/zoller-webseite/en/company/reports-stories/details/venturion-verbessert-die-produktivitaet/","v70":"https://mzollercreations.github.io/zoller-webseite/en/company/reports-stories/details/venturion-erhoeht-genauigkeit-und-prozesssicherheit/","procam":"https://mzollercreations.github.io/zoller-hungary/vallalat/jelentesek-es-toertenetek/reszletek/mit-smile-420-zu-1-mio-usd-umsatzplus/","top55":"https://mzollercreations.github.io/zoller-hungary/vallalat/jelentesek-es-toertenetek/reszletek/mit-smile-420-zu-1-mio-usd-umsatzplus/","sycotec":"https://mzollercreations.github.io/zoller-hungary/az-oen-sikere/reszletek/mehr-tempo-weniger-werkzeugbrueche/","genius60":"https://mzollercreations.github.io/zoller-hungary/vallalat/jelentesek-es-toertenetek/reszletek/so-effizient-kann-genius-kosten-senken/","life15":"https://mzollercreations.github.io/zoller-webseite/en/company/reports-stories/details/mit-smile-zu-mehr-effizienz-und-hoeherer-qualitaet/","zid45":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/adatatvitel/zidcode/","zdmi":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/adatatvitel/zidcode/zidcode-40/","robobox":"https://mzollercreations.github.io/zoller-hungary/termekek/automatizalas/szerszamok-elokeszitese/robobox/gyik/","redo10":"https://mzollercreations.github.io/zoller-hungary/termekek/hore-zsugorodo-technika/redomatic/gyik/","runout3":"https://mzollercreations.github.io/zoller-hungary/megoldasok/szerszamtartok/","tb04":"https://mzollercreations.github.io/zoller-hungary/termekek/kiegyensulyozasi-technika/toolbalancer/","ps27":"https://mzollercreations.github.io/zoller-hungary/termekek/hore-zsugorodo-technika/powershrink/gyik/","keeper420":"https://mzollercreations.github.io/zoller-hungary/termekek/eszkoezkezeles/szerszamraktar/keeper/konfiguracio/","roboset":"https://mzollercreations.github.io/zoller-hungary/az-oen-sikere/reszletek/wirtschaftlich-in-serien-messen-mit-roboset-2/","hyp20":"https://mzollercreations.github.io/zoller-hungary/termekek/beallitas-es-meres/vizszintes-gepek/hyperion/"}};</script>
+</head>
+<body>
+<div class="app" data-app data-step="intro">
+  <header class="bar">
+    <a class="bar__logo" data-home href="https://mzollercreations.github.io/zoller-webseite/" aria-label="ZOLLER"><img src="assets/img/zoller.svg" alt="ZOLLER" width="104" height="24"></a>
+    <span class="bar__title"><span data-t="ui.title">Werkzeugraum-Planer</span></span>
+    <nav class="steps" aria-label="Schritte" data-steps></nav>
+    <div class="bar__tools">
+      <a class="bar__showroom" data-showroom href="https://mzollercreations.github.io/zoller-produktumgebung-3d/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.8 20 7.4v9.2l-8 4.6-8-4.6V7.4z"/><path d="M4 7.4l8 4.6 8-4.6M12 12v9.2"/></svg><span data-t="ui.showroom">3D-Showroom</span></a>
+      <div class="langsel"><select data-lang aria-label="Sprache"></select></div>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="stage" data-stage>
+      <canvas></canvas>
+      <div class="labels" data-labels></div>
+      <div class="hud" data-hud>
+        <div class="seg seg--mode" role="group" data-mode>
+          <button type="button" data-v="before" data-t="room.before">Heute</button>
+          <button type="button" data-v="after" class="is-on" data-t="room.after">Mit ZOLLER</button>
+        </div>
+        <div class="hud__views" data-views>
+          <button type="button" data-view="overview" data-t="room.v.overview">Übersicht</button>
+          <button type="button" data-view="toolroom" data-t="room.v.toolroom">Werkzeugraum</button>
+          <button type="button" data-view="hall" data-t="room.v.hall">Maschinen</button>
+          <button type="button" class="hud__tour" data-tour><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg><span data-t="room.tour">Rundgang starten</span></button>
+        </div>
+      </div>
+      <div class="caption" data-caption hidden></div>
+      <div class="ticker" data-ticker hidden></div>
+      <div class="loader" data-loader><span data-t="ui.loading">Halle wird aufgebaut …</span><i><b data-progress></b></i></div>
+    </section>
+
+    <aside class="panel" data-panel>
+      <div class="panel__inner" data-panel-inner></div>
+    </aside>
+  </main>
+
+  <section class="intro" data-intro>
+    <div class="intro__inner">
+      <p class="kicker" data-t="intro.kicker">ZOLLER Werkzeugraum-Planer</p>
+      <h1 data-t="intro.h1">Beschreiben Sie Ihre Fertigung. Wir planen Ihren Werkzeugraum.</h1>
+      <p class="lead" data-t="intro.lead"></p>
+      <form class="prompt" data-prompt>
+        <textarea rows="4" data-prompt-text data-tp="intro.placeholder" aria-label="Ihre Fertigung"></textarea>
+        <div class="prompt__bar">
+          <div class="prompt__hits" data-hits aria-live="polite"></div>
+          <button class="btn btn--yellow" type="submit"><span data-t="intro.go">Werkzeugraum planen</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+      </form>
+      <p class="intro__ex-h" data-t="intro.examples">Oder ein Beispiel wählen:</p>
+      <div class="intro__ex" data-examples></div>
+      <p class="intro__foot"><button type="button" class="link" data-manual data-t="intro.manual">Lieber Schritt für Schritt eingeben</button><span data-t="intro.trust"></span></p>
+    </div>
+  </section>
+
+  <section class="gain" data-gain hidden></section>
+</div>
+
+<div class="report" data-report></div>
+<dialog class="sheet" data-sheet><div class="sheet__inner" data-sheet-inner></div></dialog>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+<noscript><p style="padding:2rem;font:16px/1.5 sans-serif">Der Werkzeugraum-Planer braucht JavaScript und WebGL.</p></noscript>
+<script type="module" src="assets/js/app.js?v=3764867204"></script>
+</body>
+</html>

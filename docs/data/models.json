@@ -1,0 +1,287 @@
+{
+ "venturion": {
+  "id": "venturion",
+  "file": "models/venturion.glb",
+  "screen": "models/tex/screen_pilot4_measure.webp",
+  "size": [
+   2.317,
+   1.944,
+   0.846
+  ],
+  "tris": 30716,
+  "classes": [
+   "anodized",
+   "bellows",
+   "blackoxide",
+   "blackplastic",
+   "brass",
+   "chrome",
+   "darkgrey",
+   "glossblack",
+   "paper",
+   "red",
+   "screen",
+   "steel",
+   "teal",
+   "whitealu",
+   "whiteplastic",
+   "yellow"
+  ]
+ },
+ "zidcode": {
+  "id": "zidcode",
+  "file": "models/zidcode.glb",
+  "screen": "models/tex/screen_zid_scan.webp",
+  "size": [
+   0.402,
+   1.422,
+   0.489
+  ],
+  "tris": 59407,
+  "classes": [
+   "blackoxide",
+   "blackplastic",
+   "darkgrey",
+   "paper",
+   "screen",
+   "whitealu",
+   "yellow"
+  ]
+ },
+ "venturion600": {
+  "id": "venturion600",
+  "file": "models/venturion600.glb",
+  "screen": "models/tex/screen_pilot4_measure.webp",
+  "size": [
+   2.273,
+   1.932,
+   0.876
+  ],
+  "tris": 31335,
+  "classes": [
+   "anodized",
+   "bellows",
+   "blackoxide",
+   "blackplastic",
+   "brass",
+   "chrome",
+   "darkgrey",
+   "glossblack",
+   "paper",
+   "red",
+   "screen",
+   "steel",
+   "teal",
+   "whitealu",
+   "whiteplastic",
+   "yellow"
+  ]
+ },
+ "venturion800": {
+  "id": "venturion800",
+  "file": "models/venturion800.glb",
+  "screen": "models/tex/screen_pilot4_measure.webp",
+  "size": [
+   2.616,
+   2.128,
+   0.876
+  ],
+  "tris": 35231,
+  "classes": [
+   "anodized",
+   "bellows",
+   "blackoxide",
+   "blackplastic",
+   "brass",
+   "chrome",
+   "darkgrey",
+   "glossblack",
+   "paper",
+   "red",
+   "screen",
+   "steel",
+   "teal",
+   "whitealu",
+   "whiteplastic",
+   "yellow"
+  ]
+ },
+ "smile": {
+  "id": "smile",
+  "file": "models/smile.glb",
+  "screen": "models/tex/screen_pilot4_contour.webp",
+  "size": [
+   1.881,
+   1.724,
+   0.667
+  ],
+  "tris": 45793,
+  "classes": [
+   "anodized",
+   "bellows",
+   "blackoxide",
+   "blackplastic",
+   "chrome",
+   "darkgrey",
+   "glossblack",
+   "pa6",
+   "paper",
+   "red",
+   "screen",
+   "steel",
+   "teal",
+   "whitealu",
+   "whiteplastic",
+   "yellow",
+   "zinc"
+  ]
+ },
+ "keeper": {
+  "id": "keeper",
+  "file": "models/keeper.glb",
+  "screen": "models/tex/screen_tms_keeper.webp",
+  "size": [
+   1.813,
+   2.1,
+   1.507
+  ],
+  "tris": 155872,
+  "classes": [
+   "anodized",
+   "blackplastic",
+   "blue",
+   "darkgrey",
+   "pa6",
+   "whitealu",
+   "whiteplastic",
+   "yellow"
+  ]
+ },
+ "toolorganizer": {
+  "id": "toolorganizer",
+  "file": "models/toolorganizer.glb",
+  "screen": "models/tex/screen_tms_organizer.webp",
+  "size": [
+   0.8,
+   1.731,
+   0.789
+  ],
+  "tris": 76308,
+  "classes": [
+   "anodized",
+   "blackplastic",
+   "darkgrey",
+   "screen",
+   "steel",
+   "whitealu"
+  ]
+ },
+ "toolstation": {
+  "id": "toolstation",
+  "file": "models/toolstation.glb",
+  "screen": "models/tex/screen_tms_station.webp",
+  "size": [
+   2.445,
+   2.097,
+   0.862
+  ],
+  "tris": 134941,
+  "classes": [
+   "anodized",
+   "blackplastic",
+   "darkgrey",
+   "screen",
+   "steel",
+   "whitealu",
+   "whiteplastic",
+   "wood",
+   "worktop",
+   "yellow"
+  ]
+ },
+ "redomatic600": {
+  "id": "redomatic600",
+  "file": "models/redomatic600.glb",
+  "screen": "models/tex/screen_pilot4_measure.webp",
+  "size": [
+   3.548,
+   1.971,
+   1.906
+  ],
+  "tris": 91180,
+  "classes": [
+   "anodized",
+   "bellows",
+   "blackoxide",
+   "blackplastic",
+   "blue",
+   "brass",
+   "chrome",
+   "darkgrey",
+   "glossblack",
+   "paper",
+   "red",
+   "screen",
+   "steel",
+   "teal",
+   "whitealu",
+   "whiteplastic",
+   "worktop",
+   "yellow",
+   "zinc"
+  ]
+ },
+ "powershrink400": {
+  "id": "powershrink400",
+  "file": "models/powershrink400.glb",
+  "screen": "models/tex/screen_pilot4_contour.webp",
+  "size": [
+   1.073,
+   1.757,
+   0.644
+  ],
+  "tris": 47087,
+  "classes": [
+   "anodized",
+   "bellows",
+   "blackplastic",
+   "darkgrey",
+   "glossblack",
+   "red",
+   "steel",
+   "whitealu",
+   "whiteplastic",
+   "worktop",
+   "yellow"
+  ]
+ },
+ "toolbalancer": {
+  "id": "toolbalancer",
+  "file": "models/toolbalancer.glb",
+  "screen": "models/tex/screen_pilot4_contour.webp",
+  "size": [
+   1.543,
+   1.726,
+   2.016
+  ],
+  "tris": 80980,
+  "classes": [
+   "bellows",
+   "blackplastic",
+   "chrome",
+   "darkgrey",
+   "glossblack",
+   "pa6",
+   "paper",
+   "red",
+   "screen",
+   "steel",
+   "teal",
+   "whitealu",
+   "whiteplastic",
+   "wood",
+   "yellow",
+   "zinc"
+  ]
+ }
+}
