@@ -388,7 +388,7 @@ function panelProfile() {
   const a = (f) => (k.has(f) ? '' : `<span class="badge">${esc(t('prof.assumed'))}</span>`);
   const yn = (v) => (v ? t('chip.yes') : t('chip.no'));
   if (!p.machines.length) return `<div class="chat">${chat}</div><p style="margin-top:1rem"><button class="btn btn--ghost btn--sm" data-act="addm">+ ${esc(t('prof.add'))}</button></p>`;
-  return `<details class="pcard-sum" ${S.sumOpen ? 'open' : ''} data-sum><summary><span><b>${esc(t('prof.h'))}</b><small>${esc(t('prof.total', { n }))} · ${p.shifts} ${esc(t('f.shifts').split(' ')[0])} · ${eur(S.gain?.eur || 0)}</small></span><i>${esc(t('ui.edit'))}</i></summary>
+  return `<details class="pcard-sum" ${S.sumOpen ? 'open' : ''} data-sum><summary><span><b>${esc(t('prof.h'))}</b><small>${esc(t('prof.total', { n }))} · ${esc(t('chip.shifts', { v: p.shifts }))} · ${eur(S.gain?.eur || 0)}</small></span><i>${esc(t('ui.edit'))}</i></summary>
   <div class="p-sec" style="margin-top:.8rem"><h3>${esc(t('prof.machines'))} <span>${esc(t('prof.total', { n }))}</span></h3><div class="mlist">${ms}</div>
     <p style="margin:.6rem 0 0"><button class="btn btn--ghost btn--sm" data-act="addm">+ ${esc(t('prof.add'))}</button></p></div>
   <div class="p-sec"><h3>${esc(t('prof.production'))} <button class="link" data-act="editprod">${esc(t('ui.edit'))}</button></h3><dl class="kv">

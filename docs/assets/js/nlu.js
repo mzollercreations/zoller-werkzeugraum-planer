@@ -15,7 +15,7 @@ const NUMW = {
 
 const TYPE_RE = [
   ['turnmill', /dreh-?\s?fräs|fräs-?\s?dreh|turn-?\s?mill|mill-?\s?turn|multi-?task|komplettbearbeitung|b-achs|tour-?fraise|torno-?fresadora|multitarea/],
-  ['swiss', /langdreh|swiss[- ]?type|\bswiss\b|décolletage|decolletage|torno\s?suizo|torno\s?de\s?cabezal\s?móvil|sliding\s?head/],
+  ['swiss', /langdreh|swiss[- ]?type|\bswiss\b|décolletage|decolletage|tornos?\s?suizos?|tornos?\s?de\s?cabezal\s?móvil|tours? à poupée mobile|sliding\s?head/],
   ['5ax', /5[- ]?achs|fünf-?achs|5[- ]?axis|five[- ]axis|5\s?ejes|5\s?axes|simultan(fräs)?|5x\b/],
   ['hmc', /horizontal(es|e|en)?\s?(bearbeitungs|fräs|baz|machining|mill)|\bhmc\b|horizontal(e|es)?\s?(zentr|center)|palettenwechsl|pallet\s?changer|centre\s?d.usinage\s?horizontal|centro\s?de\s?mecanizado\s?horizontal/],
   ['grinder', /werkzeugschleif|schleifmaschine|grinder|grinding\s?machine|rectificadora|affûteuse|affuteuse|rectifieuse/],
@@ -79,7 +79,7 @@ function modelOf(brand, seg, orig) {
     const m = seg.match(re);
     if (m) {
       // Anzeige: Treffer + folgende Ziffern/Kürzel aus dem Originaltext
-      const tail = seg.slice(m.index).match(/^[a-z0-9.-]+(\s?[0-9]{1,4}[a-z]{0,3})?(\s?(monoblock|duoblock|evo|ii|iii|nx|nxt|\bs\b|\bv\b))?/i);
+      const tail = seg.slice(m.index).match(/^[a-z0-9.-]+(\s?[0-9]{1,4}[a-z]{0,3}(?!\s?(台|대|шт|adet|x\b|×)))?(\s?(monoblock|duoblock|evo|ii|iii|nx|nxt))?/i);
       let model = (tail ? tail[0] : m[0]).trim();
       const o = orig.toLowerCase().indexOf(model);
       if (o >= 0) model = orig.substr(o, model.length);
@@ -130,7 +130,7 @@ export function parse(text, ctx = {}) {
   const P = out.patch;
 
   // ---------------------------------------------------------- Maschinen (Segment für Segment)
-  const segs = s.split(/[\n;.!?():]|,(?!\d)|\s(?:und|and|et|y|sowie|plus|außerdem|ausserdem|zusätzlich|also|as well as|ainsi que|además)\s|\s\+\s|\s\/\s/);
+  const segs = s.split(/[\n;.!?():，、；。：（）]|,(?!\d)|\s(?:e|i|a|y|in|és|och|ve|и)\s(?=\d)|\s(?:und|and|et|oraz|sowie|plus|außerdem|ausserdem|zusätzlich|also|as well as|ainsi que|además)\s|[和及및]|(?<=[a-z0-9台대])\s?(?:と|와|과)\s?|\s\+\s|\s\/\s/);
   let lastGroups = [];
   for (const raw of segs) {
     const seg = ' ' + raw.trim() + ' ';
@@ -152,6 +152,10 @@ export function parse(text, ctx = {}) {
     // Maschinenbegriff ohne Zahl und ohne Marke ist oft nur Kontext (»Fräsen in Titan«) → nur mit Zahl übernehmen
     const idx = Math.min(br ? br.idx : 1e9, tword ? tidx : 1e9);
     let count = countBefore(seg, idx);
+    if (!count) {   // »DMU 50 を 4 台«, »DMU 50 4대«, »DMU 50 – 4 шт.«
+      const a = seg.slice(idx).match(/(\d+)\s?(台|대|шт|adet|units?|pcs|stück|db\b|ks\b|kos\b|szt)/);
+      if (a) count = +a[1];
+    }
     if (!br && !count) continue;
     if (!count) count = /\b(mehrere|several|some|einige|plusieurs|varias|varios)\b/.test(seg) ? 2 : 1;
     const mod = modelOf(br?.b, seg, orig);
@@ -178,7 +182,7 @@ export function parse(text, ctx = {}) {
 
   // ---------------------------------------------------------- Produktion
   let m;
-  if ((m = s.match(/(\d)\s?-?\s?(schicht|shift|turno|équipe|equipe|poste)/))) P.shifts = Math.min(3, +m[1]);
+  if ((m = s.match(/(\d)\s?-?\s?(schicht|shift|turno|équipe|equipe|poste|vardiya|смен|zmian|zmiany|směn|zmen|műszak|izmen|turni|skift|交代|班|교대)/))) P.shifts = Math.min(3, +m[1]);
   else if (/24\s?\/\s?7|rund um die uhr|around the clock|24 stunden|24 hours|3schicht|vollkonti/.test(s)) P.shifts = 3;
   else if (/(1|ein)schicht|single shift/.test(s)) P.shifts = 1;
   else if ((m = s.match(/(\d)schicht/))) P.shifts = Math.min(3, +m[1]);
@@ -187,7 +191,7 @@ export function parse(text, ctx = {}) {
   else if (/(6|sechs)\s?-?tage|6-day|6 days a week|samstag/.test(s)) P.days = 280;
   if (P.days) hit('days', P.days);
   // Werkzeugwechsel pro Schicht/Tag
-  const CH = '(\\d+)\\s?(werkzeug|tool\\s?|outil\\s?|herramienta\\s?)?-?\\s?(wechsel|changes?|cambios?|changements?)\\s?(?:\\w+\\s){0,2}?(?:pro|je|per|a|am|\\/|par|por|each|every)\\s(?:[\\wäöü]+\\s){0,3}?';
+  const CH = '(\\d+)\\s?(werkzeug|tool\\s?|outil\\s?|herramienta\\s?)?-?\\s?(wechsel|changes?|cambios?|changements?)\\s?(?:\\S+\\s){0,2}?(?:pro|je|per|a|am|\\/|par|por|each|every)\\s(?:\\S+\\s){0,3}?';
   if ((m = s.match(new RegExp(CH + '(schicht|shift|turno|poste|équipe)')))) P.changes = +m[1];
   else if ((m = s.match(new RegExp(CH + '(tag|day|jour|día|dia)')))) P._changesDay = +m[1];
   else if ((m = s.match(/(\d+)\s?(komplett)?(werkzeuge?|tools?|outils?|herramientas?)\s?(\w+\s){0,3}?(pro|je|per|a|am|\/|par|por|each|every)\s?(\w+\s){0,3}?(schicht|shift|turno|poste)/))) { if (/maschine|machine|máquina/.test(m[0])) P.changes = +m[1]; else P._changesShiftTotal = +m[1]; }
@@ -200,6 +204,7 @@ export function parse(text, ctx = {}) {
     if (+m[1] >= 20 && !/\d/.test(before)) { P.tools = +m[1]; break; }
   }
   if ((m = s.match(/(werkzeugbestand|bestand|inventory|tool\s?stock)\D{0,22}(\d{2,6})/))) P.tools = +m[2];
+  if (!P.tools && (m = s.match(/(\d{2,5})\s?(本|把|개|инструмент|takım|narzędzi|nástroj|szerszám|orodij|utensili|herramientas|ferramentas|verktyg)/))) P.tools = +m[1];
   if (P.tools) hit('tools', P.tools);
   // Stundensatz
   if ((m = s.match(/(\d{2,3})\s?(€|eur|euro|\$|usd|dollar|£|chf)\s?(\/|pro|je|per|an|the|la|por|a l')\s?(h\b|std|stunde|hour|hr|heure|hora)/)) ||
@@ -211,38 +216,38 @@ export function parse(text, ctx = {}) {
 
   // ---------------------------------------------------------- Branche
   const IND = [
-    ['aero', /luftfahrt|luft- und raumfahrt|aerospace|aviation|flugzeug|triebwerk|raumfahrt|aéronaut|aeronáut|\baero\b|\bas\s?9100/],
-    ['medical', /medizin|medical|implantat|dental|orthopäd|chirurg|médical|médic|\biso\s?13485/],
-    ['auto', /automobil|automotive|kfz|\btier\s?1\b|\boem\b|fahrzeug|e-?mobil|getriebe|motorenteile|automoción|automobile/],
-    ['mold', /formenbau|werkzeug-?\s?und\s?formenbau|mold|mould|moule|molde|stanzwerkzeug|druckguss|spritzguss/],
+    ['aero', /luftfahrt|flyg|航空|항공|авиа|havacılık|lotnic|letect|repülő|letalst|aeronautic|luft- und raumfahrt|aerospace|aeroespacial|aerospazial|aviation|flugzeug|triebwerk|raumfahrt|aéronaut|aeronáut|\baero\b|\bas\s?9100/],
+    ['medical', /medizin|医療|医疗|의료|медиц|medikal|medyc|zdravotn|orvos|medicin|medical|implantat|dental|orthopäd|chirurg|médical|médic|\biso\s?13485/],
+    ['auto', /automobil|automóvel|automotiv|fordon|自動車|汽车|자동차|автомоб|автопром|otomotiv|motoryzac|automobilov|autóipar|avtomobil|automotive|automotriz|automotor|kfz|\btier\s?1\b|\boem\b|fahrzeug|e-?mobil|getriebe|motorenteile|automoción|automobile/],
+    ['mold', /formenbau|金型|模具|금형|пресс-форм|kalıp|form wtryskow|forem|werkzeug-?\s?und\s?formenbau|mold|mould|moule|molde|stanzwerkzeug|druckguss|spritzguss/],
     ['toolmaker', /werkzeughersteller|werkzeugherstellung|präzisionswerkzeuge herstell|tool\s?manufactur|cutting\s?tool\s?maker|schleiferei|nachschleifdienst|regrind\s?service/],
-    ['energy', /energie|energy|öl|oil\s?(and|&)\s?gas|\bgas\b|windkraft|wind\s?power|kraftwerk|turbinen|énergie|energía/],
+    ['energy', /energie|energy|\böl\b|oil\s?(and|&)\s?gas|\bgas\b|windkraft|wind\s?power|kraftwerk|turbinen|énergie|energía/],
     ['machinery', /maschinenbau|anlagenbau|sondermaschin|machine\s?build|machinery|construction\s?mécanique|maquinaria/],
-    ['job', /lohnfertig|auftragsfertig|job\s?shop|contract\s?manufactur|zulieferer|sous-traitan|subcontrat|taller/],
+    ['job', /lohnfertig|sob encomenda|contoterzis|legotillverk|zákazkov|受託|来料加工|代工|수탁|контрактн|fason|usługi obróbki|zakázkov|bérmegmunkál|pogodben|conto terzi|auftragsfertig|job\s?shop|contract\s?manufactur|zulieferer|sous-traitan|subcontrat|taller/],
     ['precision', /feinmechanik|präzisionsteile|precision\s?parts|uhren|watch|optik|décolletage/],
   ];
   for (const [id, re] of IND) if (re.test(s)) { P.industry = id; hit('industry', id); break; }
 
   // ---------------------------------------------------------- Ist-Zustand + Technik
-  const sh = test(s, /schrumpf|shrink|frettage|contracci|termorretr|zsugor|skurcz|heat\s?fit/);
+  const sh = test(s, /schrumpf|shrink|frettage|contracci|termorretr|zsugor|skurcz|heat\s?fit|焼きばめ|热缩|열박음|термо|termokurcz|tepeln|krčn|calettament|contração|krymp/);
   if (sh !== null) { P.shrink = sh; hit('shrink', sh); }
-  let hsc = test(s, /\bhsc\b|hochgeschwindigkeit|high[- ]speed|grande vitesse|alta velocidad|\bhpc\b/);
-  if ((m = s.match(/(\d{5})\s?(u\/min|upm|rpm|min-1|1\/min|tr\/min|rev)/)) && +m[1] >= 15000) hsc = true;
+  let hsc = test(s, /\bhsc\b|hochgeschwindigkeit|high[- ]speed|grande vitesse|alta velocidad|\bhpc\b|高回転|高转速|고회전|высокоскорост|yüksek devir|alta velocità/);
+  if ((m = s.match(/(\d{5})\s?(u\/min|upm|rpm|min-1|min⁻¹|1\/min|tr\/min|rev|об|dev|giri|obr|ot)/)) && +m[1] >= 15000) hsc = true;
   if (hsc !== null) { P.hsc = hsc; hit('hsc', hsc); }
-  const gr = test(s, /schleifen\s([a-zäöü]+\s){0,3}(selbst\s)?nach\b|nachschleif|nachschärf|selbst schleifen|schleifen (wir|selbst)|werkzeugschleif|eigene werkzeuge (her|schleif)|regrind|resharpen|re-?sharpen|réaffût|reafilado|tool\s?grinding/);
+  const gr = test(s, /再研削|重磨|재연삭|переточ|bileme|biliyor|ostrz|přebrus|přebruš|prebrus|prebruš|slipar om|omslip|reafia|újraélez|nabruš|schleifen\s([a-zäöü]+\s){0,3}(selbst\s)?nach\b|nachschleif|nachschärf|selbst schleifen|schleifen (wir|selbst)|werkzeugschleif|eigene werkzeuge (her|schleif)|regrind|resharpen|re-?sharpen|réaffût|reafil|riaffil|tool\s?grinding/);
   if (gr !== null) { P.grind = gr; hit('grind', gr); }
   if (/serie|series|großserie|mass production|high volume|stückzahl|production en série|producción en serie/.test(s)) { P.series = true; hit('series', true); }
   if (/losgröße\s?1\b|einzelteil|prototyp|one-?off|small\s?batch|kleinserie|high[- ]mix|petites séries|lotes pequeños/.test(s)) { P.series = false; hit('series', false); }
   if (/\bcam\b|mastercam|hypermill|esprit|nx\s?cam|solidcam|topsolid|tebis|fusion\s?360|gibbscam|edgecam|powermill/.test(s)) { P.cam = true; hit('cam', true); }
 
   if (/(haben|besitzen|nutzen|have|own|use|utilisons|tenemos)\s(\w+\s){0,3}(zoller|smile|venturion|hyperion)/.test(s)) P.measure = 'zoller';
-  else if (/alte[snr]?\s(\w+\s)?(einstell|voreinstell|mess)gerät|altes\s?gerät|optical\s?comparator|profilprojektor|old\s?presetter|älteres|veraltet|outdated presetter/.test(s)) P.measure = 'old';
+  else if (/alte[snr]?\s(\w+\s)?(einstell|voreinstell|mess)gerät|altes\s?gerät|optical\s?comparator|profilprojektor|old\s?presetter|älteres|veraltet|outdated presetter|ancien banc|vieux banc|preajustador antiguo|antiguo preajustador|viejo/.test(s)) P.measure = 'old';
   else if (/messschieber|messuhr|caliper|von hand mess|ohne einstellgerät|kein(en)?\s(voreinstell|einstell)gerät|no\s?presetter|without\s?a?\s?presetter|sin\s?preajust|pied à coulisse|calibre/.test(s)) P.measure = 'manual';
-  else if (/in der maschine|antast|messtaster|tastsystem|laser\s?(in der|an der) maschine|touch[- ]?off|in[- ]machine|on the machine|probe|papierstreifen|z-?setter|en máquina|dans la machine|blum|renishaw|tool\s?setter/.test(s)) P.measure = 'machine';
+  else if (/in der maschine|antast|messtaster|tastsystem|laser\s?(in der|an der) maschine|touch[- ]?off|in[- ]machine|on the machine|probe|papierstreifen|z-?setter|en máquina|en la máquina|dans la machine|na máquina|nella macchina|in macchina|i maskinen|機内|机内|在机床|기계 안|в станке|на станке|tezgâhta|tezgahta|w maszynie|ve stroji|v stroji|a gépben|v stroju|blum|renishaw|tool\s?setter/.test(s)) P.measure = 'machine';
   if (P.measure) hit('measure', P.measure);
   if (/postprozessor|post-?processor|\brfid\b|balluff|direkt in die steuerung|dnc|netzwerk/.test(s) && !/tippen|abtipp/.test(s)) P.data = 'post';
-  else if (/zettel|papier|einrichteblatt|aufschreiben|paper|hand-?written|notiz|papel|feuille/.test(s)) P.data = 'paper';
-  else if (/abtipp|eintipp|tippen|von hand (ein|in)|manuell (ein|übertr)|tippfehler|eingabefehler|type (it|them|values) in|typing|type in|key in|manual(ly)? (enter|entry|input)|saisie manuelle|a mano/.test(s)) P.data = 'typed';
+  else if (/zettel|papier|einrichteblatt|aufschreiben|paper|hand-?written|notiz|papel|feuille|紙|纸|종이|бумаг|kâğıt|kağıt|kartk|papír|papir/.test(s)) P.data = 'paper';
+  else if (/abtipp|eintipp|tippen|von hand (ein|in)|manuell (ein|übertr)|tippfehler|eingabefehler|type (it|them|values) in|typing|type in|key in|manual(ly)? (enter|entry|input)|saisie manuelle|saisiss|à la main|a mano|teclea|tecleamos|tecleo|digitamos|à mão|手入力|手动输入|手工输入|직접 입력|вручную|elle gir|ręcznie|ručně|ručne|kézzel|ročno|a mano|för hand/.test(s)) P.data = 'typed';
   if (P.data) hit('data', P.data);
   if (/\btms\b|werkzeugverwaltung(ssoftware)?|tool\s?management\s?software|\btdm\b|winTool|zoller tms/.test(s) && !neg(s, s.search(/\btms\b|werkzeugverwaltung/))) P.storage = 'tms';
   else if (/regal|schublade|offene[nm]?\s?(lager|schr)|such(en|zeit|t|e)|chaos|unordnung|kisten|kartons|shelves|drawers|search|cherch|busca|desorden/.test(s)) P.storage = 'open';
@@ -251,7 +256,7 @@ export function parse(text, ctx = {}) {
 
   // ---------------------------------------------------------- Probleme + Ziele
   const PAINS = [
-    ['search', /such(en|zeit|t)|search|cherch|busca/], ['typos', /tippfehler|eingabefehler|zahlendreher|typo|input error|erreur de saisie/],
+    ['search', /such(en|zeit|t)|search|cherch|busca|leta|letande|hľada|探|找刀|找|찾|поиск|ищ|arama|arıyor|szuka|hledá|hľadá|keres|iska|cerca/], ['typos', /tippfehler|eingabefehler|zahlendreher|typo|input error|erreur de saisie/],
     ['crash', /crash|kollision|collision|zusammenst/], ['scrap', /ausschuss|nacharbeit|scrap|rework|rebut|chatarra/],
     ['chatter', /ratter|vibration|chatter|unwucht|imbalance|unbalance|balourd|desequilibr/], ['spindle', /spindel(schaden|schäden|lager|tausch|crash| kaputt| defekt)|spindle\s?(damage|failure|repair|rebuild)|broche|husillo/],
     ['skills', /fachkr(ä|a)ft|personalmangel|mitarbeiter (fehlen|finden)|skilled|labou?r shortage|pénurie|escasez/],
@@ -259,7 +264,7 @@ export function parse(text, ctx = {}) {
   ];
   for (const [id, re] of PAINS) if (re.test(s)) { out.pains.push(id); hit('pain', id); }
   const GOALS = [
-    ['unmanned', /mannlos|geisterschicht|lights[- ]?out|unattended|unmanned|sans surveillance|desatendid/],
+    ['unmanned', /mannlos|geisterschicht|lights[- ]?out|unattended|unmanned|sans surveillance|sans opérateur|desatendid|sin personal|sin operador/],
     ['automation', /automatis|automation|roboter|robot|automatiz/], ['transparency', /transparen|kennzahl|kpi|überblick|digitalis|smart factory|industrie\s?4/],
     ['quality', /qualität|quality|qualité|calidad|präzision|precision/], ['cost', /kosten senken|kostendruck|cost|coût|costo/],
   ];

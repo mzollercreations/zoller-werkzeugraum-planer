@@ -37,9 +37,11 @@ CURRENCY = {"de": ("EUR", 1), "at": ("EUR", 1), "es": ("EUR", 1), "fr": ("EUR", 
             "pl": ("PLN", 4.3), "cz": ("CZK", 25), "hu": ("HUF", 395), "cn": ("CNY", 7.9), "jp": ("JPY", 165), "kr": ("KRW", 1500),
             "in": ("INR", 93), "br": ("BRL", 6), "uk": ("GBP", .85), "ru": ("RUB", 100), "tr": ("TRY", 40)}
 
-TITLE = {"de": "Werkzeugraum-Planer", "en": "Toolroom Planner"}
+TITLE = {"de": "Werkzeugraum-Planer", "en": "Toolroom Planner", "fr": "Planificateur d’outillage", "es": "Planificador de sala de herramientas"}
 DESC = {"de": "Beschreiben Sie Ihre Fertigung – der ZOLLER Werkzeugraum-Planer stellt Ihre Maschinen in eine 3D-Halle, plant den passenden Werkzeugraum aus echten CAD-Daten und rechnet aus, was Sie gewinnen.",
-        "en": "Describe your production – the ZOLLER Toolroom Planner puts your machines into a 3D hall, plans the matching toolroom from real CAD data and calculates what you gain."}
+        "en": "Describe your production – the ZOLLER Toolroom Planner puts your machines into a 3D hall, plans the matching toolroom from real CAD data and calculates what you gain.",
+        "fr": "Décrivez votre production – le planificateur ZOLLER place vos machines dans un hall 3D, planifie la salle d’outillage adaptée à partir de vraies données CAO et calcule votre gain.",
+        "es": "Describa su producción: el planificador ZOLLER coloca sus máquinas en una nave 3D, planifica la sala de herramientas adecuada con datos CAD reales y calcula su ganancia."}
 
 
 def js_paths():
@@ -65,7 +67,20 @@ def version():
     return hashlib.sha1(b"".join(f.read_bytes() for f in files)).hexdigest()[:10]
 
 
+def ui_text(lang, key):
+    """Text aus strings-<lang>.js (für Titel und Beschreibung der Seite)"""
+    f = DOCS / "assets" / "js" / f"strings-{lang}.js"
+    if not f.exists():
+        return None
+    m = re.search(r"'" + re.escape(key) + r"':\s*'((?:[^'\\]|\\.)*)'", f.read_text(encoding="utf-8"))
+    return m.group(1).replace("\\'", "'") if m else None
+
+
 def page(cfg, lang, base, ver):
+    TITLE.setdefault(lang, ui_text(lang, "ui.title"))
+    DESC.setdefault(lang, ui_text(lang, "intro.lead"))
+    if not TITLE[lang]: TITLE[lang] = TITLE["en"]
+    if not DESC[lang]: DESC[lang] = DESC["en"]
     t = (ROOT / "tools" / "index.template.html").read_text(encoding="utf-8")
     t = t.replace('<html lang="de">', f'<html lang="{cfg["locale"]}">')
     t = t.replace("<title>Werkzeugraum-Planer | ZOLLER</title>", f"<title>{TITLE.get(lang, TITLE['en'])} | ZOLLER</title>")
@@ -89,7 +104,7 @@ def main():
         for loc in site["locales"]:
             code = loc["code"]
             folder = "" if not loc["src"] else code.lower() + "/"
-            ui = loc["lang"] if loc["lang"] in langs else "en"
+            ui = code if code in langs else (loc["lang"] if loc["lang"] in langs else "en")   # z. B. pt-BR vor pt
             if loc["src"]:
                 L = BL.Locale(site, loc)
                 web = lambda p, L=L: L.web_de(p) or en_int.web_de(p)   # noqa: E731
@@ -103,7 +118,7 @@ def main():
                 sibs = sibs[:1] + [l for s in sites.values() for l in s["locales"] if l["src"] == "en_DE" and not l.get("overlay")]
             lang_map = {}
             for l in sibs:
-                k = l["lang"] if l["lang"] in langs else "en"
+                k = l["code"] if l["code"] in langs else (l["lang"] if l["lang"] in langs else "en")
                 lang_map.setdefault(k, "" if not l["src"] else l["code"].lower() + "/")
             co = site.get("company") or {}
             cfg = {
