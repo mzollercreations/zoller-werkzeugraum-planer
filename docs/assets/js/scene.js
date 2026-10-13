@@ -65,7 +65,7 @@ export class Hall {
     c.enableDamping = true; c.dampingFactor = .08; c.maxPolarAngle = 1.42; c.minDistance = 2.2; c.maxDistance = 220;
     c.screenSpacePanning = true; c.target.set(10, 0, 0);
     c.addEventListener('change', () => this.kick());
-    c.addEventListener('start', () => { this.stopTour(); this.camAnim = null; this.lastView = null; });
+    c.addEventListener('start', () => { this.stopTour(); this.camAnim = null; this.lastView = null; c.autoRotate = false; });
     // Licht
     sc.add(new THREE.HemisphereLight(0xffffff, 0xcfc8bb, .85));
     const sun = this.sun = new THREE.DirectionalLight(0xfff4e2, 2.1);
@@ -696,6 +696,7 @@ export class Hall {
     this.kick();
   }
   setShift(f) { this.shift = f; this.applyShift(); this.kick(); }
+  setAutoRotate(on) { this.controls.autoRotate = on; this.controls.autoRotateSpeed = .35; this.kick(); }
   applyShift() {
     const w = this.el.clientWidth, h = this.el.clientHeight;
     if (this.shift && w) this.camera.setViewOffset(w, h, -this.shift * w, 0, w, h); else this.camera.clearViewOffset();
@@ -719,7 +720,9 @@ export class Hall {
       });
       busy = true;
     }
+    if (this.controls.autoRotate && (this.camAnim || matchMedia('(prefers-reduced-motion: reduce)').matches)) this.controls.autoRotate = false;
     const changed = this.controls.update();
+    if (this.controls.autoRotate) busy = true;
     // Maschinen-Signalsäulen
     for (const m of this.machines.values()) setMachineState(m.userData.body, this.mode === 'after' ? 'after' : 'before', t);
     // Werkzeugfluss
@@ -770,19 +773,29 @@ export class Hall {
   }
 
   // ---------------------------------------------------------------- Export
-  snapshot(w = 1600) {
-    const pr = this.renderer.getPixelRatio(), size = new THREE.Vector2(); this.renderer.getSize(size);
-    const h = Math.round(w * size.y / size.x);
+  snapshot(w = 1600, h = 900) {
+    // eigenes Bild im Format w×h: Übersicht sofort einpassen, danach Kamera und Größe zurück
+    const pr = this.renderer.getPixelRatio();
+    const cam = this.camera, keep = { pos: cam.position.clone(), tgt: this.controls.target.clone(), aspect: cam.aspect, fov: cam.fov };
     this.renderer.setPixelRatio(1); this.renderer.setSize(w, h, false);
-    this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
-    this.renderer.render(this.scene, this.camera);
+    cam.clearViewOffset(); cam.aspect = w / h; cam.fov = 34; cam.updateProjectionMatrix();
+    if (this.bounds) {
+      const anim = this.camAnim; this.frame(this.bounds.hall, [.12, .62, 1], 0, .96);
+      const a = this.camAnim; this.camAnim = anim;
+      if (a) { cam.position.copy(a.p1); cam.lookAt(a.t1); }
+    }
+    this.renderer.render(this.scene, cam);
     const url = this.canvas.toDataURL('image/jpeg', .9);
+    cam.position.copy(keep.pos); cam.fov = keep.fov; this.controls.target.copy(keep.tgt); cam.lookAt(keep.tgt);
     this.renderer.setPixelRatio(pr); this.resize();
     return url;
   }
-  exportRoot() {
+  exportRoot(toolroomOnly = false) {
     const g = new THREE.Group(); g.name = 'ZOLLER_Werkzeugraum';
-    for (const o of [...this.devG.children, ...this.macG.children, ...this.zoneG.children.filter(o => o.isMesh && o.material !== this.glassMat)]) {
+    const parts = toolroomOnly ? [...this.devG.children.filter(o => !PRODUCTS[o.userData.pid]?.atMachine), this.zoneG.children[0]]
+                               : [...this.devG.children, ...this.macG.children, ...this.zoneG.children.filter(o => o.isMesh && o.material !== this.glassMat)];
+    for (const o of parts) {
+      if (!o) continue;
       if (o.scale.x < .5) continue;
       const c = o.clone(true);
       c.traverse(x => { if (x.isMesh && x.material?.map === this.shadowTex) x.visible = false; });
@@ -797,9 +810,11 @@ export class Hall {
   }
   async exportUSDZ() {
     const { USDZExporter } = await import('../vendor/USDZExporter.js');
-    const root = this.exportRoot();
-    root.scale.setScalar(1);
-    const arr = await new USDZExporter().parseAsync(root, { quickLookCompatible: true });
+    const root = this.exportRoot(true);      // AR: nur der Werkzeugraum, in echter Größe
+    const box = new THREE.Box3().setFromObject(root), c = box.getCenter(new THREE.Vector3());
+    root.position.set(-c.x, 0, -c.z);
+    const wrap = new THREE.Group(); wrap.add(root);
+    const arr = await new USDZExporter().parseAsync(wrap, { quickLookCompatible: true });
     return new Blob([arr], { type: 'model/vnd.usdz+zip' });
   }
 }

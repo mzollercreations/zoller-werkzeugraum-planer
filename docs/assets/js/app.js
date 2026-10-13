@@ -92,7 +92,10 @@ async function init() {
       onPick: onPick, onProgress: (k) => { $('[data-progress]').style.width = (k * 100) + '%'; if (k >= 1) setTimeout(() => $('[data-loader]').classList.add('is-done'), 300); },
       onTourEnd: () => { $('[data-tour] span').textContent = t('room.tour'); },
     });
-    S.hall.setPlan({ devices: [], machines: [], software: [], lang: LANG }).then(() => { S.hall.view('overview'); $('[data-loader]').classList.add('is-done'); });
+    S.hall.setPlan({ devices: [], machines: [], software: [], lang: LANG }).then(() => {
+      S.hall.view('overview'); $('[data-loader]').classList.add('is-done');
+      setTimeout(() => { if (S.step === 'intro') S.hall.setAutoRotate(true); }, 1500);
+    });
   } catch (err) {
     console.error(err);
     $('[data-loader]').innerHTML = '<span>WebGL nicht verfügbar – die Planung funktioniert trotzdem.</span>';
@@ -128,7 +131,7 @@ function liveParse(text) {
     const p = defaultProfile(FX); apply(p, r, newMachine, true);
     const n = p.machines.reduce((a, m) => a + m.count, 0);
     S.preview = p; schedulePlan(p, []);
-    if (n !== S.previewN) { S.previewN = n; setTimeout(() => S.hall.view(n ? 'hall' : 'overview'), 250); }
+    if (n !== S.previewN) { S.previewN = n; S.hall.setAutoRotate(false); setTimeout(() => { S.hall.view(n ? 'hall' : 'overview'); setTimeout(() => S.step === 'intro' && S.hall.setAutoRotate(true), 1500); }, 250); }
   }
 }
 function hitChips(r) {
@@ -318,6 +321,7 @@ function onPick(hit) {
 // ------------------------------------------------------------------ Navigation
 function go(step, keepCam) {
   if (step !== 'profile' && !S.profile.machines.length) step = 'profile';
+  S.hall?.setAutoRotate(false);
   S.step = step;
   app.dataset.step = step;
   render();
@@ -619,7 +623,7 @@ function bindPanel() {
     else if (act === 'addm') editMachine(null);
     else if (act === 'editprod') editProduction();
     else if (act === 'tour') toggleTour();
-    else if (act === 'png') { const url = S.hall.snapshot(2000); download(url, 'ZOLLER-Werkzeugraum.jpg'); }
+    else if (act === 'png') { const url = S.hall.snapshot(2400, 1350); download(url, 'ZOLLER-Werkzeugraum.jpg'); }
     else if (act === 'glb') { toast(t('room.export')); const b = await S.hall.exportGLB(); download(URL.createObjectURL(b), 'ZOLLER-Werkzeugraum.glb'); }
     else if (act === 'ar') {
       toast(t('room.export'));
@@ -773,11 +777,11 @@ async function mail() {
 }
 function report() {
   const p = S.profile, g = S.gain;
-  const shot = S.hall ? S.hall.snapshot(1800) : '';
+  const shot = S.hall ? S.hall.snapshot(1800, 900) : '';
   const date = new Date().toLocaleDateString(LANG === 'de' ? 'de-DE' : LANG);
   $('[data-report]').innerHTML = `<div class="r-top"><img src="${BASE}assets/img/zoller.svg" alt="ZOLLER"><span class="r-small">${esc(t('rep.date', { v: date }))}</span></div>
   <h1>${esc(t('rep.title'))}${p.company ? ' – ' + esc(p.company) : ''}</h1>
-  <div class="r-hero"><div><b>${eurExact(g.eur)}</b>${esc(t('gain.eur'))}</div><div><b>+${fmt(g.spindle)} h</b>${esc(t('gain.spindle'))}</div><div><b>${NF1.format(g.machinesEq)}</b>${esc(t('gain.machines'))}</div><div><b>${g.payback ? esc(t('gain.months', { v: NF1.format(g.payback) })) : eurExact(g.budget12)}</b>${esc(g.payback ? t('gain.payback') : t('gain.budget'))}</div></div>
+  <div class="r-hero"><div><b>${eurExact(g.eur)}</b>${esc(t('gain.eur'))}</div><div><b>+${fmt(g.spindle)} h</b>${esc(t('gain.spindle'))}</div><div><b>${NF1.format(g.machinesEq)}</b>${esc(t('gain.machines'))}</div><div><b>${g.payback ? esc(t('gain.months', { v: NF1.format(g.payback) })) : eurExact(g.eur / p.days)}</b>${esc(g.payback ? t('gain.payback') : t('gain.wait'))}</div></div>
   ${shot ? `<img class="shot" src="${shot}" alt="">` : ''}
   <h2>${esc(t('rep.profile'))}</h2><table><tr><th>${esc(t('rep.qty'))}</th><th>${esc(t('f.brand'))} / ${esc(t('f.model'))}</th><th>${esc(t('f.type'))}</th><th>${esc(t('f.control'))}</th></tr>
   ${p.machines.map((m) => `<tr><td>${m.count}</td><td>${esc([m.brand, m.model].filter(Boolean).join(' ') || '–')}</td><td>${esc(t('mt.' + m.type))}</td><td>${esc(CONTROLS[m.control]?.name || '–')}</td></tr>`).join('')}</table>
