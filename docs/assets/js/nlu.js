@@ -11,6 +11,11 @@ const NUMW = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, twenty: 20, thirty: 30, dozen: 12,
   un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, sept: 7, huit: 8, neuf: 9, dix: 10, douze: 12, vingt: 20,
   uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10, doce: 12, veinte: 20,
+  tre: 3, quattro: 4, sei: 6, otto: 8, dieci: 10, dois: 2, duas: 2, três: 3, quatro: 4, oito: 8, dez: 10,
+  två: 2, fyra: 4, fem: 5, åtta: 8, tio: 10, dwie: 2, dwa: 2, trzy: 3, cztery: 4, pięć: 5, osiem: 8,
+  dvě: 2, dva: 2, tři: 3, čtyři: 4, pět: 5, osm: 8, dve: 2, tri: 3, štyri: 4, päť: 5, štiri: 4,
+  két: 2, kettő: 2, három: 3, négy: 4, öt: 5, nyolc: 8, iki: 2, üç: 3, dört: 4, beş: 5, sekiz: 8,
+  один: 1, одна: 1, два: 2, две: 2, три: 3, четыре: 4, пять: 5, шесть: 6, восемь: 8, десять: 10,
 };
 
 const TYPE_RE = [
@@ -37,7 +42,8 @@ function normalize(text) {
   s = s.replace(/(\d)[.,'’ ](\d{3})(?!\d)/g, '$1$2').replace(/(\d)[.,'’ ](\d{3})(?!\d)/g, '$1$2');   // 2.500 / 2,500 / 2 500
   s = s.replace(/(\d+)\s?k\b(?!w)/g, (m, d) => String(+d * 1000));                                   // 30k
   s = s.replace(/\b(ein|zwei|drei)-?(schicht)/g, (m, a, b) => ({ ein: 1, zwei: 2, drei: 3 }[a]) + b);
-  s = s.replace(/\b([a-zäöüßéèáíóñ]+)\b/g, (w) => (NUMW[w] !== undefined ? String(NUMW[w]) : w));
+  s = s.replace(/\p{L}+/gu, (w) => (NUMW[w] !== undefined ? String(NUMW[w]) : w));
+  s = s.replace(/\bdue (?=turni|macchine|torni|fresatrici|centri|rettificatrici)/g, '2 ');   // »due« nur italienisch als Zahl
   s = s.replace(/(\d+)\s?(x|×|mal|stk\.?|stück|pcs\.?|units?|unidades|unités)\s/g, '$1 ');
   return s;
 }
@@ -182,7 +188,7 @@ export function parse(text, ctx = {}) {
 
   // ---------------------------------------------------------- Produktion
   let m;
-  if ((m = s.match(/(\d)\s?-?\s?(schicht|shift|turno|équipe|equipe|poste|vardiya|смен|zmian|zmiany|směn|zmen|műszak|izmen|turni|skift|交代|班|교대)/))) P.shifts = Math.min(3, +m[1]);
+  if ((m = s.match(/(?<!\d)(\d)\s?-?\s?(schicht|shift|turno|équipe|equipe|poste|vardiya|смен(?!\S*\s?инструм)|zmian|zmiany|směn|zmen|műszak|izmen|turni|skift|交代|班|교대)/))) P.shifts = Math.min(3, +m[1]);
   else if (/24\s?\/\s?7|rund um die uhr|around the clock|24 stunden|24 hours|3schicht|vollkonti/.test(s)) P.shifts = 3;
   else if (/(1|ein)schicht|single shift/.test(s)) P.shifts = 1;
   else if ((m = s.match(/(\d)schicht/))) P.shifts = Math.min(3, +m[1]);
@@ -191,12 +197,33 @@ export function parse(text, ctx = {}) {
   else if (/(6|sechs)\s?-?tage|6-day|6 days a week|samstag/.test(s)) P.days = 280;
   if (P.days) hit('days', P.days);
   // Werkzeugwechsel pro Schicht/Tag
-  const CH = '(\\d+)\\s?(werkzeug|tool\\s?|outil\\s?|herramienta\\s?)?-?\\s?(wechsel|changes?|cambios?|changements?)\\s?(?:\\S+\\s){0,2}?(?:pro|je|per|a|am|\\/|par|por|each|every)\\s(?:\\S+\\s){0,3}?';
-  if ((m = s.match(new RegExp(CH + '(schicht|shift|turno|poste|équipe)')))) P.changes = +m[1];
+  const CH = '(\\d+)\\s?(werkzeug|tool\\s?|outil\\s?|herramienta\\s?)?-?\\s?(wechsel|changes?|cambios?|changements?|cambi|trocas?|verktygsbyten|byten|wymian\\S*|výměn|výmen|menjav\\S*|szerszámcser\\S*|смен\\S*\\s?инструмент\\S*|takım\\s?değişim\\S*|回の工具交換|次换刀|회\\s?공구\\s?교환)\\s?(?:\\S+\\s){0,2}?(?:pro|je|per|a|am|\\/|par|por|each|every)\\s(?:\\S+\\s){0,4}?';
+  if ((m = s.match(new RegExp(CH + '(schicht|shift|turno|poste|équipe|смену|vardiya|zmian|směnu|zmenu|műszak|izmeno|skift|班|シフト|교대)')))) P.changes = +m[1];
   else if ((m = s.match(new RegExp(CH + '(tag|day|jour|día|dia)')))) P._changesDay = +m[1];
   else if ((m = s.match(/(\d+)\s?(komplett)?(werkzeuge?|tools?|outils?|herramientas?)\s?(\w+\s){0,3}?(pro|je|per|a|am|\/|par|por|each|every)\s?(\w+\s){0,3}?(schicht|shift|turno|poste)/))) { if (/maschine|machine|máquina/.test(m[0])) P.changes = +m[1]; else P._changesShiftTotal = +m[1]; }
   else if ((m = s.match(/(\d+)\s?(komplett)?(werkzeuge?|tools?|outils?|herramientas?)\s?(\w+\s){0,3}?(pro|je|per|a|am|\/|par|por|each|every)\s?(tag|day|jour|día|dia)/))) P._toolsDay = +m[1];
   else if ((m = s.match(/(rüsten|ruesten|setzen|messen|stellen|set up|preset|measure)\s?(wir\s|we\s)?(\w+\s)?(\d+)\s?(werkzeuge?|tools?)/))) P._toolsDay = +m[4];
+  // Fallback für andere Wortstellungen (»1 シフトあたり約 15 回の工具交換«, »15 szerszámcsere … műszakonként«):
+  // die Zahl, die einem Wort für Werkzeugwechsel am nächsten steht; Schicht oder Tag aus dem Umfeld
+  if (!P.changes && !P._changesDay && !P._changesShiftTotal && !P._toolsDay) {
+    const CHW = /werkzeugwechsel|tool\s?changes?|changements? d.outils?|cambios? de herramienta|cambi utensile|trocas? de ferramenta|verktygsbyten|wymian\S*\s?narzędzi|výměn\S*\s?nástroj|výmen\S*\s?nástroj|menjav\S*\s?orodj|szerszámcser\S*|смен\S*\s?инструмент\S*|takım\s?değişim\S*|工具交換|换刀|공구\s?교환/g;
+    const SHIFTW = /schicht|shift|turno|poste|équipe|смен|vardiya|zmian|směn|zmen|műszak|izmen|skift|班|シフト|교대/;
+    const DAYW = /\btag|\bday|jour|día|dia\b|giorno|dag\b|dzień|dnevno|denně|denne|naponta|günde|день|天|日|하루/;
+    let best = null;
+    for (const cm of s.matchAll(CHW)) {
+      const a = Math.max(0, cm.index - 25), win = s.slice(a, cm.index + cm[0].length + 25);
+      for (const nm of win.matchAll(/\d+/g)) {
+        const v = +nm[0], at = a + nm.index;
+        if (v < 2 || v > 99) continue;
+        const dist = at < cm.index ? cm.index - at - nm[0].length : at - cm.index - cm[0].length;
+        if (!best || dist < best.dist) best = { v, dist, pos: cm.index };
+      }
+    }
+    if (best) {
+      const ctx = s.slice(Math.max(0, best.pos - 60), best.pos + 80);
+      if (SHIFTW.test(ctx)) P.changes = best.v; else if (DAYW.test(ctx)) P._changesDay = best.v;
+    }
+  }
   // Werkzeugbestand
   const toolRe = /(\d+)\s?(komplett-?|complete\s)?(werkzeuge?n?|tools?|outils?|herramientas?|werkzeugaufnahmen|tool\s?holders?|halter)\b(?!\s?(\w+\s){0,2}(pro|je|per|am|a\s(day|shift)|\/|par|por|each|every|wechsel))/g;
   while ((m = toolRe.exec(s))) {
@@ -236,8 +263,8 @@ export function parse(text, ctx = {}) {
   if (hsc !== null) { P.hsc = hsc; hit('hsc', hsc); }
   const gr = test(s, /再研削|重磨|재연삭|переточ|bileme|biliyor|ostrz|přebrus|přebruš|prebrus|prebruš|slipar om|omslip|reafia|újraélez|nabruš|schleifen\s([a-zäöü]+\s){0,3}(selbst\s)?nach\b|nachschleif|nachschärf|selbst schleifen|schleifen (wir|selbst)|werkzeugschleif|eigene werkzeuge (her|schleif)|regrind|resharpen|re-?sharpen|réaffût|reafil|riaffil|tool\s?grinding/);
   if (gr !== null) { P.grind = gr; hit('grind', gr); }
-  if (/serie|series|großserie|mass production|high volume|stückzahl|production en série|producción en serie/.test(s)) { P.series = true; hit('series', true); }
-  if (/losgröße\s?1\b|einzelteil|prototyp|one-?off|small\s?batch|kleinserie|high[- ]mix|petites séries|lotes pequeños/.test(s)) { P.series = false; hit('series', false); }
+  if (/losgröße\s?1\b|einzelteil|prototyp|one-?off|small\s?batch|kleinserie|high[- ]mix|petites séries|lotes pequeños|pequenos lotes|piccoli lotti|seriestorlek 1|lotti da 1|lotes de 1|lotes 1|batch sizes? 1|partie od 1|partii od 1|dávky 1|dávky od 1|serije od 1|1[–-]50|1 till 50|1 à 50|1 a 50|1 al 50|1 ile 50|от 1 до 50|1\s?至\s?50|1\s?〜\s?50|1\s?~\s?50|kis sorozat|小ロット|小批量|소량|малые партии|küçük parti/.test(s)) { P.series = false; hit('series', false); }
+  else if (/serie|séri|series|großserie|mass production|high volume|stückzahl|seri üretim|серийн|sériov|seryjn|sorozatgyárt|serijsk|量産|批量|양산/.test(s)) { P.series = true; hit('series', true); }
   if (/\bcam\b|mastercam|hypermill|esprit|nx\s?cam|solidcam|topsolid|tebis|fusion\s?360|gibbscam|edgecam|powermill/.test(s)) { P.cam = true; hit('cam', true); }
 
   if (/(haben|besitzen|nutzen|have|own|use|utilisons|tenemos)\s(\w+\s){0,3}(zoller|smile|venturion|hyperion)/.test(s)) P.measure = 'zoller';

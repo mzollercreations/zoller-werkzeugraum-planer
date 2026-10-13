@@ -85,9 +85,16 @@ def page(cfg, lang, base, ver):
     t = t.replace('<html lang="de">', f'<html lang="{cfg["locale"]}">')
     t = t.replace("<title>Werkzeugraum-Planer | ZOLLER</title>", f"<title>{TITLE.get(lang, TITLE['en'])} | ZOLLER</title>")
     t = re.sub(r'<meta name="description" content="[^"]*">', f'<meta name="description" content="{html.escape(DESC.get(lang, DESC["en"]))}">', t)
-    head = (f'<base href="{base}">\n' if base else "") + f"<script>window.PLANER = {json.dumps(cfg, ensure_ascii=False, separators=(',', ':'))};</script>"
-    t = t.replace("<!--planer-config-->", head)
+    if base:   # <base> muss vor allen Links, Stilen und der Import-Map stehen
+        t = t.replace('<meta charset="utf-8">', f'<meta charset="utf-8">\n<base href="{base}">', 1)
+    t = t.replace("<!--planer-config-->", f"<script>window.PLANER = {json.dumps(cfg, ensure_ascii=False, separators=(',', ':'))};</script>")
     t = re.sub(r'(assets/(?:css/app\.css|js/app\.js))\?v=\w+', rf'\1?v={ver}', t)
+    # alle Module mit Versionsnummer laden (Import-Map), damit nach einem Update keine alten Dateien aus dem Cache kommen
+    imports = {"three": f"./assets/vendor/three.module.min.js?v={ver}"}
+    for f in sorted((DOCS / "assets" / "js").glob("*.js")) + sorted((DOCS / "assets" / "vendor").glob("*.js")):
+        rel = f.relative_to(DOCS).as_posix()
+        imports["./" + rel] = f"./{rel}?v={ver}"
+    t = re.sub(r'<script type="importmap">.*?</script>', '<script type="importmap">' + json.dumps({"imports": imports}) + '</script>', t, flags=re.S)
     return t
 
 
