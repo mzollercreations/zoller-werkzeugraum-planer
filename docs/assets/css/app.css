@@ -272,6 +272,9 @@ a { color: inherit; }
 .day__bar i[data-k="entry"] { background: #ffb000; }
 .day__legend { display: flex; gap: 1rem; flex-wrap: wrap; font-size: .76rem; color: rgba(255, 255, 255, .7); margin-top: .2rem; }
 .day__legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: .4rem; vertical-align: -1px; background: var(--c); }
+.cum__key { margin-top: .5rem; }
+.cum__key .is-dash::before { width: 16px; height: 0; border-radius: 0; vertical-align: 3px; background: none; border-top: 2px dashed var(--c); }
+.cum__key .is-dot::before { border-radius: 50%; border: 2px solid #000; box-sizing: border-box; }
 .day__note { font-size: .86rem; color: rgba(255, 255, 255, .8); line-height: 1.5; margin: .6rem 0 0; }
 .day__note b { color: var(--yellow); }
 .chart { width: 100%; height: auto; display: block; overflow: visible; }
@@ -364,14 +367,31 @@ details.more summary { cursor: pointer; font-size: .8rem; color: rgba(255, 255, 
   .report .r-chart .t { font: 11px var(--font); fill: #444; }
   .report .r-chart .v { font: 700 12px var(--font); fill: #111; }
   .report .r-cap { max-width: 85mm; }
-  .report .r-donut { display: grid; grid-template-columns: 38mm 1fr; gap: 4mm; align-items: center; }
-  .report .r-donut .t { font: 10px var(--font); fill: #555; } .report .r-donut .v { font: 700 13px var(--font); fill: #111; }
+  .report .r-donut { display: grid; grid-template-columns: 38mm minmax(0, 1fr); gap: 5mm; align-items: center; }
+  .report .r-donut svg { display: block; width: 38mm; height: 38mm; }
+  .report .r-donut .t { font: 15px var(--font); fill: #555; } .report .r-donut .v { font: 700 25px var(--font); fill: #111; }
+  .report .r-bars { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 3.5mm; align-items: center; }
+  .report .r-bars span { grid-column: 1 / -1; font-size: 8pt; color: #444; line-height: 1.25; margin: 2.2mm 0 .9mm; }
+  .report .r-bars span:first-child { margin-top: 0; }
+  .report .r-bars i { display: block; height: 2.6mm; background: #eef0f1; border-radius: .6mm; overflow: hidden; }
+  .report .r-bars b { display: block; height: 100%; min-width: .8mm; border-radius: .6mm; }
+  .report .r-bars strong { font-size: 9pt; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .report .r-hbars { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 3mm; row-gap: 2.4mm; align-items: center; }
+  .report .r-hbars > span { font-size: 8pt; color: #444; line-height: 1.2; max-width: 26mm; }
+  .report .r-hbars > p { display: flex; align-items: center; gap: 1.6mm; margin: 0; min-width: 0; }
+  .report .r-hbars b { flex: 0 1 auto; height: 5.6mm; min-width: 1mm; border-radius: .8mm; }
+  .report .r-hbars strong { flex: none; font-size: 9pt; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .report .r-hbars > p.r-stack { gap: 0; height: 5.6mm; }
+  .report .r-stack i { flex: none; height: 100%; overflow: hidden; display: flex; align-items: center; }
+  .report .r-stack em { font-style: normal; font-size: 8pt; color: #333; padding-left: 1.6mm; white-space: nowrap; }
   .report .r-legend { display: grid; gap: 1.5mm; font-size: 8pt; }
-  .report .r-legend i { display: inline-block; width: 3mm; height: 3mm; border-radius: .6mm; margin-right: 1.5mm; vertical-align: -.3mm; }
-  .report .r-legend div { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; }
-  .report .r-legend b { flex: none; font-variant-numeric: tabular-nums; }
-  .report .r-key { display: flex; gap: 4mm; font-size: 7.5pt; color: #444; margin-top: 1.5mm; }
+  .report .r-legend i { width: 3mm; height: 3mm; border-radius: .6mm; margin-top: .45mm; }
+  .report .r-legend div { display: grid; grid-template-columns: 3mm minmax(0, 1fr) auto; align-items: start; gap: 1.6mm; line-height: 1.3; }
+  .report .r-legend b { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+  .report .r-key { display: flex; flex-wrap: wrap; gap: 1mm 4mm; font-size: 7.5pt; color: #444; margin-top: 1.5mm; }
   .report .r-key span::before { content: ""; display: inline-block; width: 3mm; height: 3mm; background: var(--c); margin-right: 1.2mm; vertical-align: -.4mm; border-radius: .5mm; }
+  .report .r-key .is-dash::before { width: 5mm; height: 0; border-radius: 0; vertical-align: .7mm; background: none; border-top: .5mm dashed var(--c); }
+  .report .r-key .is-dot::before { border-radius: 50%; border: .5mm solid #000; box-sizing: border-box; }
   .report .r-big { font-size: 13pt; font-weight: 700; margin: 1.5mm 0 1mm; }
   .report .r-src li { margin-bottom: 1mm; }
 }

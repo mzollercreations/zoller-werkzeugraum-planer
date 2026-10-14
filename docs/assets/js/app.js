@@ -38,6 +38,8 @@ const CUR = CFG.currency || 'EUR', FX = CFG.fx || 1;
 const NF = new Intl.NumberFormat(LOC, { maximumFractionDigits: 0 });
 const NF1 = new Intl.NumberFormat(LOC, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
 const CF = new Intl.NumberFormat(LOC, { style: 'currency', currency: CUR, maximumFractionDigits: 0 });
+const CFK = new Intl.NumberFormat(LOC, { style: 'currency', currency: CUR, notation: 'compact', maximumFractionDigits: 2 });
+const PC = { y: '#f0e600', yd: '#c9bf00', ink: '#111214', g: '#8a9096', gl: '#d9dcdf', gx: '#eef0f1', red: '#e2552f', amber: '#f2a900', green: '#1f9d55' };
 const SYM = CF.formatToParts(0).find((x) => x.type === 'currency')?.value || '€';
 const nice = (v) => { const x = v * FX; const m = Math.pow(10, Math.max(0, Math.floor(Math.log10(x)) - 1)); return Math.round(x / m) * m; };
 const fmt = (n) => NF.format(Math.round(n));
@@ -597,7 +599,7 @@ function renderGain() {
     <div class="gcard"><h3>${esc(t('gain.day'))}</h3><p>${esc(t('gain.daynote', { changes: ch, before: fmt(measB + entB), after: fmt(measA + entA), gain: fmt(measB + entB - measA - entA) }))}</p>
       <div class="day"><div class="day__row"><span>${esc(t('gain.before'))}</span>${bar(measB, entB)}</div><div class="day__row"><span>${esc(t('gain.after'))}</span>${bar(measA, entA)}</div>
       <div class="day__legend"><span style="--c:rgba(255,255,255,.9)">${esc(t('gain.cutting'))}</span><span style="--c:#ff6b4a">${esc(t('gain.setupblk'))}</span><span style="--c:#ffb000">${esc(t('gain.entry'))}</span></div></div></div>
-    <div class="gcard"><h3>${esc(t('gain.cum'))}</h3><p>${esc(t('gain.cumd'))}${p.invest ? ' · ' + esc(t('gain.investline')) + ': ' + eurExact(p.invest) : ''}</p>${cumChart(g.eur, p.invest)}</div>
+    <div class="gcard"><h3>${esc(t('gain.cum'))}</h3><p>${esc(t('gain.cumd'))}</p>${cumChart(g.eur, p.invest)}</div>
   </div>
   <div class="gcard"><h3>${esc(t('gain.quality'))}</h3><div class="qual">${qual.slice(0, 6).map(([b, h, x]) => `<div><b>${esc(b)}</b><strong>${esc(h)}</strong>${esc(x)}</div>`).join('')}</div>
     <div class="qual" style="margin-top:.75rem"><div><b>${fmt(g.entries)}</b>${esc(t('gain.entries'))}</div><div><b>${fmt(g.staffH)}</b>${esc(t('gain.staff'))}</div><div><b>55 % / 29 %</b>${esc(t('fact.top55'))}</div></div></div>
@@ -614,29 +616,44 @@ function countUp(el) {
   });
 }
 
-function cumChart(perYear, invest) {
-  const W = 520, H = 230, L = 64, B = 30, T = 12, R = 14;
-  const years = 5;
-  const maxV = Math.max(perYear * years, invest || 0) * 1.08 || 1;
-  const x = (i) => L + (W - L - R) * (i / years), y = (v) => T + (H - T - B) * (1 - v / maxV);
+// Textbreite in SVG-Einheiten (Schrift wie auf der Seite) – damit jede Beschriftung neben, nie in einem Diagramm steht
+const MCTX = document.createElement('canvas').getContext('2d');
+function tw(s, px, wt = 400) { MCTX.font = `${wt} ${px}px "T-Star", "Helvetica Neue", Arial, sans-serif`; return MCTX.measureText(String(s)).width * 1.05; }
+// runde Achsenwerte (1-2-2,5-5er Schritte), höchstens n Intervalle
+function niceTicks(max, n = 4) {
+  const top = max > 0 ? max : 1, raw = top / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag;
+  const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * mag;
+  return Array.from({ length: Math.max(2, Math.ceil(top / step - 1e-9) + 1) }, (_, i) => i * step);
+}
+// Fünf-Jahres-Verlauf (Bildschirm + PDF): linker Rand aus der breitesten Achsenbeschriftung, Jahre passen immer nebeneinander,
+// Investition und Amortisation stehen in der Legende unter dem Diagramm statt auf der Fläche
+function cumCore(perYear, invest, o) {
+  const { W, H, fs, vfs } = o, years = 5, T = vfs + 12, B = fs + 11;
+  const ticks = niceTicks(Math.max(perYear * years, invest || 0)), maxV = ticks[ticks.length - 1];
+  const tl = ticks.map((v) => (v ? CFK.format(v) : CF.format(0)));
+  const L = Math.ceil(Math.max(...tl.map((s) => tw(s, fs)))) + 10;
+  const yl = Array.from({ length: years }, (_, i) => t('gain.year', { v: i + 1 })), ylw = Math.max(...yl.map((s) => tw(s, fs)));
+  const R = Math.ceil(Math.max(o.R, ylw / 2 + 2)), step = (W - L - R) / years;
+  const yfs = Math.min(fs, fs * (step - 8) / ylw);
+  const x = (i) => L + step * i, y = (v) => T + (H - T - B) * (1 - v / maxV);
   const pts = Array.from({ length: years * 12 + 1 }, (_, m) => [x(m / 12), y(perYear * m / 12)]);
-  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
-  const area = line + ` L${x(years)} ${y(0)} L${x(0)} ${y(0)} Z`;
-  const ticks = [0, .25, .5, .75, 1].map((k) => maxV * k / 1.08);
-  let inv = '';
-  if (invest) {
-    const yy = y(invest);
-    const m = invest / (perYear / 12);
-    inv = `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="#ff6b4a" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${W - R}" y="${yy - 6}" text-anchor="end" class="lbl" style="fill:#ff6b4a">${esc(t('gain.investline'))}</text>`;
-    if (m <= years * 12) inv += `<circle cx="${x(m / 12)}" cy="${yy}" r="5" fill="#f0e600" stroke="#000" stroke-width="2"/><text x="${x(m / 12) + 8}" y="${yy + 16}" class="lbl">${esc(t('gain.months', { v: NF1.format(m) }))}</text>`;
-  }
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('gain.cum'))}">
-    ${ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,.08)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${eur(v)}</text>`).join('')}
-    ${Array.from({ length: years }, (_, i) => `<text x="${x(i + 1)}" y="${H - 8}" text-anchor="middle">${esc(t('gain.year', { v: i + 1 }))}</text>`).join('')}
-    <path d="${area}" fill="rgba(240,230,0,.14)"/><path d="${line}" fill="none" stroke="#f0e600" stroke-width="2.5"/>
-    ${Array.from({ length: years }, (_, i) => `<circle cx="${x(i + 1)}" cy="${y(perYear * (i + 1))}" r="4" fill="#f0e600"><title>${esc(t('gain.year', { v: i + 1 }))}: ${eurExact(perYear * (i + 1))}</title></circle>`).join('')}
-    <text x="${x(years) - 4}" y="${y(perYear * years) - 10}" text-anchor="end" class="lbl">${eur(perYear * years)}</text>
-    ${inv}</svg>`;
+  const line = pts.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join(' ');
+  const halo = o.halo ? ` paint-order="stroke" stroke="${o.halo}" stroke-width="4" stroke-linejoin="round"` : '';
+  const m = invest && perYear > 0 ? invest / (perYear / 12) : 0, inChart = m > 0 && m <= years * 12;
+  const svg = `<svg class="${o.cls}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('gain.cum'))}">
+    ${ticks.map((v, i) => `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="${o.grid}"/><text x="${L - 8}" y="${(y(v) + fs * .36).toFixed(1)}" text-anchor="end"${o.tc ? ` class="${o.tc}"` : ''}>${esc(tl[i])}</text>`).join('')}
+    ${yl.map((s, i) => `<text x="${x(i + 1).toFixed(1)}" y="${H - 6}" text-anchor="middle"${o.tc ? ` class="${o.tc}"` : ''}${yfs < fs ? ` style="font-size:${yfs.toFixed(2)}px"` : ''}>${esc(s)}</text>`).join('')}
+    <path d="${line} L${x(years)} ${y(0)} L${x(0)} ${y(0)} Z" fill="${o.area}"/><path d="${line}" fill="none" stroke="${o.line}" stroke-width="${o.lw}"/>
+    ${invest ? `<line x1="${L}" x2="${W - R}" y1="${y(invest).toFixed(1)}" y2="${y(invest).toFixed(1)}" stroke="${o.inv}" stroke-width="1.5" stroke-dasharray="5 4"/>` : ''}
+    ${yl.map((s, i) => `<circle cx="${x(i + 1).toFixed(1)}" cy="${y(perYear * (i + 1)).toFixed(1)}" r="${o.dotR}" fill="${o.dot}"><title>${esc(s)}: ${esc(eurExact(perYear * (i + 1)))}</title></circle>`).join('')}
+    ${inChart ? `<circle cx="${x(m / 12).toFixed(1)}" cy="${y(invest).toFixed(1)}" r="5" fill="${PC.y}" stroke="#000" stroke-width="2"/>` : ''}
+    <text x="${x(years).toFixed(1)}" y="${(y(perYear * years) - 9).toFixed(1)}" text-anchor="end" class="${o.vc}"${halo}>${esc(o.fmt(perYear * years))}</text></svg>`;
+  const key = invest ? `<div class="${o.keyCls}"><span class="is-dash" style="--c:${o.inv}">${esc(t('gain.investline'))}: ${esc(eurExact(invest))}</span>${inChart ? `<span class="is-dot" style="--c:${PC.y}">${esc(t('gain.payback'))}: ${esc(t('gain.months', { v: NF1.format(m) }))}</span>` : ''}</div>` : '';
+  return svg + key;
+}
+function cumChart(perYear, invest) {
+  return cumCore(perYear, invest, { W: 520, H: 230, fs: 11, vfs: 12, R: 14, cls: 'chart', tc: '', vc: 'lbl', fmt: eur, keyCls: 'day__legend cum__key',
+    grid: 'rgba(255,255,255,.08)', area: 'rgba(240,230,0,.14)', line: '#f0e600', lw: 2.5, dot: '#f0e600', dotR: 4, inv: '#ff6b4a' });
 }
 
 // ------------------------------------------------------------------ Panel: Angebot
@@ -840,72 +857,57 @@ async function mail() {
   location.href = `mailto:${CFG.mail}?subject=${encodeURIComponent(t('offer.subject') + (p.company ? ' – ' + p.company : ''))}&body=${encodeURIComponent(lines.join('\n'))}`;
 }
 // ------------------------------------------------------------------ Konzept als PDF (Druckansicht mit Diagrammen)
-const PC = { y: '#f0e600', yd: '#c9bf00', ink: '#111214', g: '#8a9096', gl: '#d9dcdf', gx: '#eef0f1', red: '#e2552f', amber: '#f2a900', green: '#1f9d55' };
 const LEVER_COLORS = ['#f0e600', '#111214', '#6f767c', '#c9bf00', '#a7adb2', '#3d4246', '#e2552f'];
-// Diagramme für das PDF: in der Breite einer Spalte (≈ 85 mm) gezeichnet, damit die Schrift in Originalgröße druckt
-const CFK = new Intl.NumberFormat(LOC, { style: 'currency', currency: CUR, notation: 'compact', maximumFractionDigits: 1 });
+// Diagramme für das PDF. Balken sind HTML (Beschriftung und Werte haben eigene Spalten, nichts kann in einen Balken
+// rutschen), Ring und Verlauf sind SVG mit fester Größe bzw. gemessenen Rändern – gleich in Safari, Chrome und Firefox.
 function svgLevers(levers) {
-  const W = 340, BW = 238, rh = 34, H = levers.length * rh + 2;
   const max = Math.max(...levers.map((l) => l.eur), 1);
-  return `<svg viewBox="0 0 ${W} ${H}" class="r-chart" role="img">${levers.map((l, i) => {
-    const y = i * rh, w = BW * l.eur / max;
-    return `<text x="0" y="${y + 12}" class="t">${esc(t('lever.' + l.id))}</text>
-      <rect x="0" y="${y + 17}" width="${BW}" height="10" rx="2" fill="${PC.gx}"/><rect x="0" y="${y + 17}" width="${Math.max(3, w)}" height="10" rx="2" fill="${i ? PC.ink : PC.y}"/>
-      <text x="${W}" y="${y + 26}" text-anchor="end" class="v">${esc(eurExact(l.eur))}</text>`;
-  }).join('')}</svg>`;
+  return `<div class="r-bars">${levers.map((l, i) => `<span>${esc(t('lever.' + l.id))}</span><i><b style="width:${(100 * l.eur / max).toFixed(2)}%;background:${i ? PC.ink : PC.y}"></b></i><strong>${esc(eurExact(l.eur))}</strong>`).join('')}</div>`;
+}
+// ganze Prozente, die zusammen genau 100 ergeben (größter Rest)
+function pct100(vals) {
+  const sum = vals.reduce((a, v) => a + v, 0);
+  if (!(sum > 0)) return vals.map(() => 0);
+  const raw = vals.map((v) => v / sum * 100), out = raw.map(Math.floor);
+  raw.map((r, i) => [r - out[i], i]).sort((a, b) => b[0] - a[0]).slice(0, 100 - out.reduce((a, v) => a + v, 0)).forEach(([, i]) => out[i]++);
+  return out;
 }
 function svgDonut(levers, total) {
-  const S0 = 230, cx = 110, cy = 110, r = 92, rin = 58;
+  const c = 110, r = 104, rin = 66;
+  const P = (a, rr) => `${(c + Math.cos(a) * rr).toFixed(2)} ${(c + Math.sin(a) * rr).toFixed(2)}`;
   let a0 = -Math.PI / 2;
   const arcs = levers.map((l, i) => {
-    const a1 = a0 + (l.eur / total) * Math.PI * 2;
-    const big = a1 - a0 > Math.PI ? 1 : 0;
-    const P = (a, rr) => `${(cx + Math.cos(a) * rr).toFixed(2)} ${(cy + Math.sin(a) * rr).toFixed(2)}`;
+    const a1 = a0 + Math.min(l.eur / total, .99999) * Math.PI * 2, big = a1 - a0 > Math.PI ? 1 : 0;
     const d = `M${P(a0, r)} A${r} ${r} 0 ${big} 1 ${P(a1, r)} L${P(a1, rin)} A${rin} ${rin} 0 ${big} 0 ${P(a0, rin)} Z`;
     a0 = a1;
     return `<path d="${d}" fill="${LEVER_COLORS[i % LEVER_COLORS.length]}" stroke="#fff" stroke-width="1.5"/>`;
   }).join('');
-  const legend = levers.map((l, i) => `<div><span><i style="background:${LEVER_COLORS[i % LEVER_COLORS.length]}"></i>${esc(t('lever.' + l.id))}</span><b>${Math.round(l.eur / total * 100)} %</b></div>`).join('');
-  return `<div class="r-donut"><svg viewBox="0 0 ${S0 - 10} ${S0 - 10}" role="img">${arcs}<text x="${cx}" y="${cy - 4}" text-anchor="middle" class="v" style="font-size:15px">${esc(eurExact(total))}</text><text x="${cx}" y="${cy + 15}" text-anchor="middle" class="t">${esc(t('rep.peryear'))}</text></svg><div class="r-legend">${legend}</div></div>`;
+  // Summe und »pro Jahr« werden auf den Innendurchmesser eingepasst
+  const val = eurExact(total), lbl = t('rep.peryear');
+  const fv = Math.min(25, 25 * (2 * rin - 18) / tw(val, 25, 700)), fl = Math.min(15, 15 * (2 * rin - 26) / tw(lbl, 15));
+  const by = c + (fv * .7 - fl * 1.2 - 6) / 2;
+  const pc = pct100(levers.map((l) => l.eur));
+  const legend = levers.map((l, i) => `<div><i style="background:${LEVER_COLORS[i % LEVER_COLORS.length]}"></i><span>${esc(t('lever.' + l.id))}</span><b>${pc[i]} %</b></div>`).join('');
+  return `<div class="r-donut"><svg viewBox="0 0 220 220" width="136" height="136" role="img">${arcs}<text x="${c}" y="${by.toFixed(1)}" text-anchor="middle" class="v" style="font-size:${fv.toFixed(2)}px">${esc(val)}</text><text x="${c}" y="${(by + fl + 6).toFixed(1)}" text-anchor="middle" class="t" style="font-size:${fl.toFixed(2)}px">${esc(lbl)}</text></svg><div class="r-legend">${legend}</div></div>`;
 }
 function svgDowntime(before, after) {
-  const W = 340, L = 74, R = 58, max = Math.max(before, after, .1);
-  const bar = (y, v, c, label) => `<text x="0" y="${y + 20}" class="t">${esc(label)}</text><rect x="${L}" y="${y + 5}" width="${Math.max(3, (W - L - R) * v / max)}" height="22" rx="3" fill="${c}"/><text x="${L + (W - L - R) * v / max + 6}" y="${y + 20}" class="v">${esc(t('gain.minutes', { v: NF1.format(v) }))}</text>`;
-  const saved = Math.round((1 - after / before) * 100);
-  return `<svg viewBox="0 0 ${W} 66" class="r-chart" role="img">${bar(0, before, PC.red, t('gain.before'))}${bar(34, after, PC.y, t('gain.after'))}</svg><p class="r-big">${saved} % ${esc(t('rep.downtime.less'))}</p>`;
+  const max = Math.max(before, after, .1);
+  // Balkenlänge relativ zur Spalte abzüglich Platz für den Wert; reicht der nicht, wird der Balken kürzer, nie überdeckt
+  const row = (v, c, label) => `<span>${esc(label)}</span><p><b style="width:calc((100% - 6.5em) * ${(v / max).toFixed(4)});background:${c}"></b><strong>${esc(t('gain.minutes', { v: NF1.format(v) }))}</strong></p>`;
+  const saved = before > 0 ? Math.round((1 - after / before) * 100) : 0;
+  return `<div class="r-hbars">${row(before, PC.red, t('gain.before'))}${row(after, PC.y, t('gain.after'))}</div><p class="r-big">${saved} % ${esc(t('rep.downtime.less'))}</p>`;
 }
 function svgShift(measB, entB, measA, entA, dayMin) {
-  const W = 340, L = 74, BW = W - L;
-  const row = (y, m, e, label) => {
-    const cut = dayMin - m - e, k = BW / dayMin;
-    return `<text x="0" y="${y + 20}" class="t">${esc(label)}</text>
-      <rect x="${L}" y="${y + 5}" width="${cut * k}" height="22" fill="${PC.gl}"/>
-      <rect x="${L + cut * k}" y="${y + 5}" width="${m * k}" height="22" fill="${PC.red}"/>
-      ${e > 0 ? `<rect x="${L + (cut + m) * k}" y="${y + 5}" width="${e * k}" height="22" fill="${PC.amber}"/>` : ''}
-      <text x="${L + 6}" y="${y + 20}" class="t" style="fill:#333">${esc(t('gain.minutes', { v: fmt(cut) }))}</text>`;
+  const row = (m, e, label) => {
+    const tot = Math.max(dayMin, m + e, 1), cut = Math.max(0, dayMin - m - e), k = 100 / tot;
+    return `<span>${esc(label)}</span><p class="r-stack"><i style="width:${(cut * k).toFixed(3)}%;background:${PC.gl}"><em>${esc(t('gain.minutes', { v: fmt(cut) }))}</em></i><i style="width:${(m * k).toFixed(3)}%;background:${PC.red}"></i>${e > 0 ? `<i style="width:${(e * k).toFixed(3)}%;background:${PC.amber}"></i>` : ''}</p>`;
   };
-  return `<svg viewBox="0 0 ${W} 66" class="r-chart" role="img">${row(0, measB, entB, t('gain.before'))}${row(34, measA, entA, t('gain.after'))}</svg>
+  return `<div class="r-hbars">${row(measB, entB, t('gain.before'))}${row(measA, entA, t('gain.after'))}</div>
     <div class="r-key"><span style="--c:${PC.gl}">${esc(t('gain.cutting'))}</span><span style="--c:${PC.red}">${esc(t('gain.setupblk'))}</span><span style="--c:${PC.amber}">${esc(t('gain.entry'))}</span></div>`;
 }
 function svgCum(perYear, invest) {
-  const W = 340, H = 190, L = 62, B = 22, T = 18, R = 8, years = 5;
-  const maxV = Math.max(perYear * years, invest || 0) * 1.1 || 1;
-  const x = (i) => L + (W - L - R) * (i / years), y = (v) => T + (H - T - B) * (1 - v / maxV);
-  const pts = Array.from({ length: years * 12 + 1 }, (_, m) => [x(m / 12), y(perYear * m / 12)]);
-  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
-  const ticks = [0, .25, .5, .75, 1].map((k) => maxV / 1.1 * k);
-  let inv = '';
-  if (invest) {
-    const yy = y(invest), m = invest / (perYear / 12);
-    inv = `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="${PC.red}" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${W - R}" y="${yy - 5}" text-anchor="end" class="t" style="fill:${PC.red}">${esc(t('gain.investline'))} ${esc(eurExact(invest))}</text>`;
-    if (m <= years * 12) inv += `<circle cx="${x(m / 12)}" cy="${yy}" r="4.5" fill="${PC.y}" stroke="#000" stroke-width="2"/><text x="${x(m / 12) + 8}" y="${yy + 16}" class="v">${esc(t('gain.payback'))}: ${esc(t('gain.months', { v: NF1.format(m) }))}</text>`;
-  }
-  return `<svg viewBox="0 0 ${W} ${H}" class="r-chart" role="img">
-    ${ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#e3e5e7"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" class="t">${esc(v ? CFK.format(v) : CF.format(0))}</text>`).join('')}
-    ${Array.from({ length: years }, (_, i) => `<text x="${x(i + 1)}" y="${H - 6}" text-anchor="${i === years - 1 ? 'end' : 'middle'}" class="t">${esc(t('gain.year', { v: i + 1 }))}</text>`).join('')}
-    <path d="${line} L${x(years)} ${y(0)} L${x(0)} ${y(0)} Z" fill="rgba(240,230,0,.35)"/><path d="${line}" fill="none" stroke="#111" stroke-width="2.2"/>
-    ${Array.from({ length: years }, (_, i) => `<circle cx="${x(i + 1)}" cy="${y(perYear * (i + 1))}" r="3" fill="#111"/>`).join('')}
-    <text x="${x(years)}" y="${y(perYear * years) - 8}" text-anchor="end" class="v">${esc(eurExact(perYear * years))}</text>${inv}</svg>`;
+  return cumCore(perYear, invest, { W: 340, H: 196, fs: 11, vfs: 12, R: 6, cls: 'r-chart', tc: 't', vc: 'v', fmt: eurExact, keyCls: 'r-key', halo: '#fff',
+    grid: '#e3e5e7', area: 'rgba(240,230,0,.35)', line: '#111', lw: 2.2, dot: '#111', dotR: 3, inv: PC.red });
 }
 function svgCapacity(n, eq) {
   // je Maschine ein Symbol, dahinter die gewonnene Kapazität in Gelb
@@ -925,7 +927,8 @@ function svgCapacity(n, eq) {
   if (frac > .02 && n + whole < 48) items.push(icon(n + whole, PC.y, frac));
   return `<svg viewBox="0 0 ${W} ${H}" class="r-chart r-cap" role="img">${items.join('')}</svg>`;
 }
-function report() {
+async function report() {
+  try { await Promise.all(['400 11px "T-Star"', '700 12px "T-Star"'].map((f) => document.fonts.load(f))); } catch {}
   const p = S.profile, g = S.gain, st = g.stats;
   const shot = S.hall ? S.hall.snapshot(2000, 1000, 'hall') : '';
   const shotTool = S.hall ? S.hall.snapshot(2000, 1000, 'tool') : '';
