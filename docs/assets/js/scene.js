@@ -36,9 +36,68 @@ const CLS = {
   led: { color: '#3ccf6a', roughness: .3, emissive: '#22c55e', emissiveIntensity: 1.6 },
 };
 
+// USDZ-Paket (ZIP ohne Kompression) schreiben: jede Datei auf 64 Byte ausgerichtet (Vorgabe für USDZ; Füllung im
+// Extrafeld, das selbst 4 Byte Kopf hat), CRC32 in Portionen mit Pausen – ein 20-MB-Paket blockiert sonst auf langsamen
+// Handys fast eine Sekunde am Stück. Prüfsummen unveränderter Dateien (Geräte) bleiben gemerkt.
+const CRC_T = (() => { const t = new Int32Array(256); for (let i = 0; i < 256; i++) { let c = i; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[i] = c; } return t; })();
+const CRC_KNOWN = new WeakMap();
+// Pause nach spätestens 30 ms Rechenzeit – über Dateigrenzen hinweg (viele kleine Dateien zählen zusammen)
+let sliceT = 0;
+async function breathe() {
+  if (performance.now() - sliceT < 30) return;
+  await new Promise((r) => setTimeout(r, 0));
+  sliceT = performance.now();
+}
+async function crc32(d) {
+  let c = CRC_KNOWN.get(d);
+  if (c !== undefined) return c;
+  c = -1;
+  for (let i = 0; i < d.length; i += 65536) {
+    const end = Math.min(d.length, i + 65536);
+    for (let j = i; j < end; j++) c = CRC_T[(c ^ d[j]) & 255] ^ (c >>> 8);
+    await breathe();
+  }
+  c = ~c >>> 0;
+  CRC_KNOWN.set(d, c);
+  return c;
+}
+async function usdzPackage(files) {
+  const enc = new TextEncoder(), parts = [], dir = [];
+  let off = 0;
+  sliceT = performance.now();
+  for (const [name, data] of Object.entries(files)) {
+    const nm = enc.encode(name), crc = await crc32(data);
+    let pad = (64 - ((off + 30 + nm.length) & 63)) & 63;
+    if (pad && pad < 4) pad += 64;
+    const h = new DataView(new ArrayBuffer(30 + nm.length + pad));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(12, 0x21, true);
+    h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true);
+    h.setUint16(26, nm.length, true); h.setUint16(28, pad, true);
+    new Uint8Array(h.buffer).set(nm, 30);
+    if (pad) { h.setUint16(30 + nm.length, 12345, true); h.setUint16(32 + nm.length, pad - 4, true); }
+    parts.push(h.buffer, data);
+    dir.push({ nm, crc, size: data.length, off });
+    off += 30 + nm.length + pad + data.length;
+  }
+  const cdLen = dir.reduce((a, e) => a + 46 + e.nm.length, 0);
+  const cd = new DataView(new ArrayBuffer(cdLen + 22));
+  let p = 0;
+  for (const e of dir) {
+    cd.setUint32(p, 0x02014b50, true); cd.setUint16(p + 4, 20, true); cd.setUint16(p + 6, 20, true); cd.setUint16(p + 14, 0x21, true);
+    cd.setUint32(p + 16, e.crc, true); cd.setUint32(p + 20, e.size, true); cd.setUint32(p + 24, e.size, true);
+    cd.setUint16(p + 28, e.nm.length, true); cd.setUint32(p + 42, e.off, true);
+    new Uint8Array(cd.buffer).set(e.nm, p + 46);
+    p += 46 + e.nm.length;
+  }
+  cd.setUint32(p, 0x06054b50, true); cd.setUint16(p + 8, dir.length, true); cd.setUint16(p + 10, dir.length, true);
+  cd.setUint32(p + 12, cdLen, true); cd.setUint32(p + 16, off, true);
+  return new Blob([...parts, cd.buffer], { type: 'model/vnd.usdz+zip' });
+}
+
 function canvasTex(w, h, draw, aniso = 8) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
-  draw(c.getContext('2d'), w, h);
+  // Leinwand im Arbeitsspeicher: wird einmal gezeichnet, dann hochgeladen und für den AR-Export gelesen (kein GPU-Rücklesen)
+  draw(c.getContext('2d', { willReadFrequently: true }), w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = aniso;
   return t;
 }
@@ -354,9 +413,9 @@ export class Hall {
     const rowEnd = x - GAP + 1.4;
     const pathZ = frontZ + 1.0;
     const TW = Math.max(rowEnd + .6, 12);
-    const toolZ1 = Math.max(pathZ + (carts.length ? 4.2 : 2.8), lMode ? zCol0 + 1.6 : 0, WALL_Z + 7.5);
-    // Werkzeugwagen parken an der Tür zur Halle
-    carts.forEach((d, i) => { d.userData.target = [TW - 1.8 - i * 1.9, pathZ + 1.9, 0]; });
+    const toolZ1 = Math.max(pathZ + (carts.length ? 4.8 : 2.8), lMode ? zCol0 + 1.6 : 0, WALL_Z + 7.5);
+    // Werkzeugwagen parken an der Tür zur Halle – mit Abstand zu den Stationsschildern am Weg (AR-Boden: bis pathZ + 1,7 m)
+    carts.forEach((d, i) => { d.userData.target = [TW - 1.8 - i * 1.9, pathZ + 2.35, 0]; });
     if (carts.length) addStation('supply', ...carts);
     if (lMode) path.push([.5 + colDepth + 1.1, zCol0 - .4], [.5 + colDepth + 1.1, pathZ]);
     else path.push([1.2, pathZ]);
@@ -1071,7 +1130,6 @@ export class Hall {
     const key = kind + '|' + this.planKey();
     if (this.arCache?.key === key) return this.arCache.blob;
     const { USDZExporter } = await import('../vendor/USDZExporter.js');
-    const { unzipSync, zipSync, strToU8, strFromU8 } = await import('../vendor/fflate.module.js');
     const room = kind === 'room';
     const S = room ? 1 : 1 / 20;
     const b = room ? this.bounds.tool : this.bounds.hall;
@@ -1114,34 +1172,33 @@ export class Hall {
       }
     }
     rest.updateMatrixWorld(true);
-    const arr = await new USDZExporter().parseAsync(rest, { quickLookCompatible: true, maxTextureSize: 4096 });
-    const files = unzipSync(arr);
-    let usda = strFromU8(files['model.usda']);
+    const files = await new USDZExporter().parseAsync(rest, { quickLookCompatible: true, maxTextureSize: 4096, files: true });
+    // three.js schreibt »token inputs:in.connect« (UsdTransform2d) und »token inputs:varname« (UsdPrimvarReader) –
+    // laut aktuellem Schema float2 bzw. string (die USD-Prüfung meldet sonst Typfehler)
+    let usda = new TextDecoder().decode(files['model.usda']).replace(/token inputs:in\.connect/g, 'float2 inputs:in.connect').replace(/token inputs:varname/g, 'string inputs:varname');
     const END = '\n\t\t}\n\t}\n}\n\n';
     const at = usda.indexOf(END);
     const fmt = (e) => `( (${e[0]}, ${e[1]}, ${e[2]}, ${e[3]}), (${e[4]}, ${e[5]}, ${e[6]}, ${e[7]}), (${e[8]}, ${e[9]}, ${e[10]}, ${e[11]}), (${e[12]}, ${e[13]}, ${e[14]}, ${e[15]}) )`;
     const xf = refs.map((r, i) => `\n\t\t\tdef Xform "ZOLLER_${r.cad}_${i}" (\n\t\t\t\tprepend references = @./devices/${r.cad}.usdc@\n\t\t\t)\n\t\t\t{\n\t\t\t\tmatrix4d xformOp:transform = ${fmt(r.m.elements)}\n\t\t\t\tuniform token[] xformOpOrder = ["xformOp:transform"]\n\t\t\t}\n`).join('');
     usda = usda.slice(0, at) + xf + usda.slice(at);
-    const out = { 'model.usda': strToU8(usda) };
+    const out = { 'model.usda': new TextEncoder().encode(usda) };
     for (const [k, v] of Object.entries(files)) if (k !== 'model.usda') out[k] = v;
-    // Gerätedateien + Bildschirmbilder dazuladen
+    // Gerätedateien + Bildschirmbilder dazuladen (je Sitzung einmal – dieselben Bytes, Prüfsumme bleibt gemerkt)
     const need = [...new Set(refs.map(r => r.cad))];
+    this.arDev ||= new Map();
+    const get = (path) => {
+      if (!this.arDev.has(path)) {
+        this.arDev.set(path, fetch(this.base + path).then((r) => { if (!r.ok) throw new Error(path); return r.arrayBuffer(); })
+          .then((b) => new Uint8Array(b)).catch((e) => { this.arDev.delete(path); throw e; }));
+      }
+      return this.arDev.get(path);
+    };
     await Promise.all(need.map(async (cad) => {
       const ar = this.opt.models[cad].ar;
-      out[`devices/${cad}.usdc`] = new Uint8Array(await (await fetch(this.base + ar.file)).arrayBuffer());
-      for (const tx of ar.tex || []) out['devices/tex/' + tx.split('/').pop()] = new Uint8Array(await (await fetch(this.base + tx)).arrayBuffer());
+      out[`devices/${cad}.usdc`] = await get(ar.file);
+      for (const tx of ar.tex || []) out['devices/tex/' + tx.split('/').pop()] = await get(tx);
     }));
-    // 64-Byte-Ausrichtung jeder Datei im unkomprimierten Paket (Vorgabe für USDZ, wie im three.js-Exporter)
-    let offset = 0;
-    const zipIn = {};
-    for (const name of Object.keys(out)) {
-      const file = out[name];
-      offset += 34 + name.length;
-      const mod = offset & 63;
-      if (mod !== 4) { zipIn[name] = [file, { extra: { 12345: new Uint8Array(64 - mod) } }]; offset += 64 - mod; } else zipIn[name] = file;
-      offset += file.length;
-    }
-    const blob = new Blob([zipSync(zipIn, { level: 0 })], { type: 'model/vnd.usdz+zip' });
+    const blob = await usdzPackage(out);
     this.arCache = { key, blob };
     return blob;
   }

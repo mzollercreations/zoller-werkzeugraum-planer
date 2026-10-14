@@ -54,7 +54,20 @@ class USDZExporter {
 		const materials = {};
 		const textures = {};
 
-		scene.traverseVisible( ( object ) => {
+		// ZOLLER-Anpassung: Geometrien in Zeitscheiben (≤ 30 ms) erzeugen – dazwischen kommt der Browser dran,
+		// sonst stockt die Seite bei großen Hallen auf langsamen Handys spürbar
+		const objects = [];
+		scene.traverseVisible( ( object ) => objects.push( object ) );
+		let slice = performance.now();
+
+		for ( const object of objects ) {
+
+			if ( performance.now() - slice > 30 ) {
+
+				await new Promise( ( resolve ) => setTimeout( resolve, 0 ) );
+				slice = performance.now();
+
+			}
 
 			if ( object.isMesh ) {
 
@@ -92,7 +105,7 @@ class USDZExporter {
 
 			}
 
-		} );
+		}
 
 
 		output += buildSceneEnd();
@@ -126,6 +139,9 @@ class USDZExporter {
 			files[ `textures/Texture_${ id }.png` ] = new Uint8Array( await blob.arrayBuffer() );
 
 		}
+
+		// ZOLLER-Anpassung: { files: true } liefert die Einzeldateien – das Paket schnürt scene.js selbst (ausgerichtet, CRC in Portionen)
+		if ( options.files === true ) return files;
 
 		// 64 byte alignment
 		// https://github.com/101arrowz/fflate/issues/39#issuecomment-777263109
@@ -173,7 +189,8 @@ function imageToCanvas( image, flipY, maxTextureSize ) {
 		canvas.width = image.width * Math.min( 1, scale );
 		canvas.height = image.height * Math.min( 1, scale );
 
-		const context = canvas.getContext( '2d' );
+		// ZOLLER-Anpassung: Leinwand im Arbeitsspeicher – toBlob muss dann nicht auf die (evtl. ausgelastete) GPU warten
+		const context = canvas.getContext( '2d', { willReadFrequently: true } );
 
 		// TODO: We should be able to do this in the UsdTransform2d?
 

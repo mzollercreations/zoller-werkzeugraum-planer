@@ -131,7 +131,7 @@ async function logoTexture() {
   const img = new Image(); img.src = BASE + 'assets/img/zoller-dark.svg';
   await img.decode().catch(() => {});
   const c = document.createElement('canvas'); c.width = 2048; c.height = 468;
-  const g = c.getContext('2d'); g.drawImage(img, 0, 0, 2048, 468);
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0, 2048, 468);
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 16;
   return tex;
 }

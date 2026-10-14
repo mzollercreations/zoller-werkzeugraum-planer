@@ -96,7 +96,7 @@ export function screenTexture(controlName, state, lang = 'de') {
   const k = controlName + '|' + state + '|' + lang;
   if (screenCache.has(k)) return screenCache.get(k);
   const c = document.createElement('canvas'); c.width = 512; c.height = 384;
-  const g = c.getContext('2d'); g.scale(2, 2);
+  const g = c.getContext('2d', { willReadFrequently: true }); g.scale(2, 2);
   const grd = g.createLinearGradient(0, 0, 0, 192); grd.addColorStop(0, '#1d2a36'); grd.addColorStop(1, '#0d141b');
   g.fillStyle = grd; g.fillRect(0, 0, 256, 192);
   g.fillStyle = '#2e4456'; g.fillRect(0, 0, 256, 22);
@@ -128,7 +128,7 @@ function lettering(text, color, bg) {
   const k = text + color + bg;
   if (letterCache.has(k)) return letterCache.get(k);
   const c = document.createElement('canvas'); c.width = 1024; c.height = 128;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', { willReadFrequently: true });
   if (bg) { g.fillStyle = bg; g.fillRect(0, 0, 1024, 128); }
   g.fillStyle = color; g.font = '800 92px "T-Star", Helvetica, Arial'; g.textBaseline = 'middle';
   const w = Math.min(1000, g.measureText(text).width);
@@ -140,7 +140,7 @@ function lettering(text, color, bg) {
 }
 function plateTexture(text) {
   const c = document.createElement('canvas'); c.width = 512; c.height = 64;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', { willReadFrequently: true });
   g.fillStyle = '#16181b'; g.fillRect(0, 0, 512, 64);
   g.fillStyle = '#f2f4f5'; g.font = '600 30px "T-Star", Helvetica, Arial'; g.textBaseline = 'middle';
   const w = Math.min(480, g.measureText(text).width);
