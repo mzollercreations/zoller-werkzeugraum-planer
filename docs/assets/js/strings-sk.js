@@ -147,7 +147,7 @@ export default {
   'gain.invest': 'Cena z ponuky (voliteľné)', 'gain.investph': 'napr. 180000', 'gain.mode': 'Spôsob výpočtu', 'gain.mode.zoller': 'Štandard ZOLLER', 'gain.mode.cons': 'Opatrný',
   'gain.moded': 'Štandard ZOLLER počíta ako kalkulačka hospodárnosti ZOLLER. Opatrný výpočet berie každú páku zhruba polovičnú.',
   'gain.assumptions': 'Vaše predpoklady', 'gain.entries': 'hodnôt ročne, ktoré sa už nepíšu ručne', 'gain.staff': 'hodín práce ročne sa uvoľní', 'gain.permachine': 'na stroj a zmenu',
-  'gain.quality': 'Čo sa nedá vyjadriť v eurách', 'gain.sources': 'Zdroje', 'gain.formula': 'Výpočet', 'gain.calc15k': 'ZOLLER garantuje najmenej 15 000 € na stroj, rok a zmenu – váš výpočet: {v}.',
+  'gain.quality': 'Čo sa nedá vyjadriť v peniazoch', 'gain.sources': 'Zdroje', 'gain.formula': 'Výpočet', 'gain.calc15k': 'ZOLLER garantuje najmenej 15 000 € na stroj, rok a zmenu – váš výpočet: {v}.',
   'gain.table': 'Ako tabuľka', 'gain.share': 'Podiel', 'gain.wait': 'stojí každý pracovný deň, keď ešte vyrábate bez ZOLLER',
   'q2.typos': 'preklepov pri stroji', 'q2.length': 'presnosť dĺžky pri tepelnom upínaní', 'q2.balance': 'kvalita vyváženia', 'q2.runout': 'hádzanie', 'q2.robobox': 'roka návratnosť (»roboBox«)', 'q2.life': 'životnosť podľa používateľov',
   'q.machines': 'Aké stroje máte vo výrobe? Stačí výrobca a rad – napr. „3 DMG MORI DMU 50, 2 Mazak Integrex“.',

@@ -147,7 +147,7 @@ export default {
   'gain.invest': '견적 금액(선택)', 'gain.investph': '예: 180000', 'gain.mode': '계산 방식', 'gain.mode.zoller': 'ZOLLER 표준', 'gain.mode.cons': '보수적',
   'gain.moded': 'ZOLLER 표준은 ZOLLER 경제성 계산기와 같은 방식으로 계산합니다. 보수적 방식은 각 항목을 약 절반으로 반영합니다.',
   'gain.assumptions': '가정', 'gain.entries': '연간 더 이상 입력하지 않는 값', 'gain.staff': '연간 확보되는 인력 시간', 'gain.permachine': '기계 1대·1교대당',
-  'gain.quality': '유로로 환산할 수 없는 가치', 'gain.sources': '출처', 'gain.formula': '계산', 'gain.calc15k': 'ZOLLER는 기계 1대·1년·1교대당 최소 15,000 €를 보장합니다 – 고객님 결과: {v}.',
+  'gain.quality': '돈으로 환산할 수 없는 가치', 'gain.sources': '출처', 'gain.formula': '계산', 'gain.calc15k': 'ZOLLER는 기계 1대·1년·1교대당 최소 15,000 €를 보장합니다 – 고객님 결과: {v}.',
   'gain.table': '표로 보기', 'gain.share': '비중', 'gain.wait': 'ZOLLER 없이 생산하는 하루하루의 비용',
   'q2.typos': '기계 앞 입력 오류', 'q2.length': '열박음 시 길이 정밀도', 'q2.balance': '밸런싱 품질', 'q2.runout': '런아웃', 'q2.robobox': '년 만에 회수(»roboBox«)', 'q2.life': '사용자가 보고한 공구 수명',
   'q.machines': '어떤 기계가 있나요? 제조사와 시리즈면 충분합니다 – 예: “DMG MORI DMU 50 3대, Mazak Integrex 2대”.',

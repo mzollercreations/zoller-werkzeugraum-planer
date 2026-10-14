@@ -6,8 +6,9 @@ import { MTYPES, CONTROLS, PRODUCTS, HEAVY_HOLDER, SERIES, KEEPER_CAP, LOADBOX_C
 
 export const TIERS = ['start', 'pro', 'smart'];
 
-export function defaultProfile(fx = 1) {
-  const r = (v) => { const x = v * fx; const m = Math.pow(10, Math.max(0, Math.floor(Math.log10(x)) - 1)); return Math.round(x / m) * m; };
+export function defaultProfile(fx = 1, money = null) {
+  // Vorgaben in Euro; money() rechnet sie in die Währung des Besuchers um und rundet auf (ZCurrency.amount)
+  const r = money || ((v) => { const x = v * fx; const m = Math.pow(10, Math.max(0, Math.floor(Math.log10(x)) - 1)); return Math.round(x / m) * m; });
   return {
     v: 2, company: '', industry: '', machines: [],
     shifts: 2, days: 220, hours: 8, changes: 20, rate: r(95), staff: r(55), tools: 0, fx,
@@ -282,8 +283,8 @@ export function pack(p) {
   o.m = p.machines.map(m => [m.count, m.type, m.brand, m.model, m.control, m.holder, m.value || 0]);
   return o;
 }
-export function unpack(o, fx = 1) {
-  const p = defaultProfile(fx);
+export function unpack(o, fx = 1, money = null) {
+  const p = defaultProfile(fx, money);
   for (const k of KEYS) if (o[k] !== undefined) p[k] = o[k];
   p.machines = (o.m || []).map(a => newMachine({ count: a[0], type: a[1], brand: a[2], model: a[3], control: a[4], holder: a[5], value: a[6] }));
   return p;

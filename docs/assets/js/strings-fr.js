@@ -147,7 +147,7 @@ export default {
   'gain.invest': 'Votre prix d’offre (facultatif)', 'gain.investph': 'p. ex. 180000', 'gain.mode': 'Mode de calcul', 'gain.mode.zoller': 'Standard ZOLLER', 'gain.mode.cons': 'Prudent',
   'gain.moded': 'Le standard ZOLLER calcule comme le calculateur de rentabilité ZOLLER. Le mode prudent retient environ la moitié de chaque levier.',
   'gain.assumptions': 'Vos hypothèses', 'gain.entries': 'valeurs par an qui ne sont plus saisies', 'gain.staff': 'heures de main-d’œuvre libérées par an', 'gain.permachine': 'par machine et par équipe',
-  'gain.quality': 'Ce qui ne se compte pas en euros', 'gain.sources': 'Sources', 'gain.formula': 'Calcul', 'gain.calc15k': 'ZOLLER garantit au moins 15 000 € par machine, par an et par équipe – votre calcul : {v}.',
+  'gain.quality': 'Ce qui ne se compte pas en argent', 'gain.sources': 'Sources', 'gain.formula': 'Calcul', 'gain.calc15k': 'ZOLLER garantit au moins 15 000 € par machine, par an et par équipe – votre calcul : {v}.',
   'gain.table': 'Sous forme de tableau', 'gain.share': 'Part', 'gain.wait': 'c’est ce que coûte chaque jour ouvré sans ZOLLER',
   'q2.typos': 'erreurs de saisie à la machine', 'q2.length': 'précision de longueur au frettage', 'q2.balance': 'qualité d’équilibrage', 'q2.runout': 'faux-rond', 'q2.robobox': 'ans d’amortissement (»roboBox«)', 'q2.life': 'durée de vie constatée par les utilisateurs',
   'q.machines': 'Quelles machines avez-vous en production ? Marque et série suffisent – p. ex. « 3 DMG MORI DMU 50, 2 Mazak Integrex ».',

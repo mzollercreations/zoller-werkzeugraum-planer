@@ -147,7 +147,7 @@ export default {
   'gain.invest': 'Cena z oferty (opcjonalnie)', 'gain.investph': 'np. 180000', 'gain.mode': 'Sposób liczenia', 'gain.mode.zoller': 'Standard ZOLLER', 'gain.mode.cons': 'Ostrożny',
   'gain.moded': 'Standard ZOLLER liczy jak kalkulator opłacalności ZOLLER. Tryb ostrożny przyjmuje każdą dźwignię mniej więcej w połowie.',
   'gain.assumptions': 'Twoje założenia', 'gain.entries': 'wartości rocznie, których nikt już nie wpisuje', 'gain.staff': 'godzin pracy rocznie do odzyskania', 'gain.permachine': 'na maszynę i zmianę',
-  'gain.quality': 'Czego nie da się policzyć w euro', 'gain.sources': 'Źródła', 'gain.formula': 'Obliczenie', 'gain.calc15k': 'ZOLLER gwarantuje co najmniej 15 000 € na maszynę, rok i zmianę – Twoje obliczenie: {v}.',
+  'gain.quality': 'Czego nie da się policzyć w pieniądzach', 'gain.sources': 'Źródła', 'gain.formula': 'Obliczenie', 'gain.calc15k': 'ZOLLER gwarantuje co najmniej 15 000 € na maszynę, rok i zmianę – Twoje obliczenie: {v}.',
   'gain.table': 'Jako tabela', 'gain.share': 'Udział', 'gain.wait': 'kosztuje każdy dzień roboczy, w którym produkujesz jeszcze bez ZOLLER',
   'q2.typos': 'błędów wpisywania przy maszynie', 'q2.length': 'dokładność długości przy termokurczu', 'q2.balance': 'jakość wyważenia', 'q2.runout': 'bicie', 'q2.robobox': 'roku zwrotu (»roboBox«)', 'q2.life': 'trwałość według użytkowników',
   'q.machines': 'Jakie maszyny pracują w Twojej produkcji? Wystarczy producent i seria – np. „3 DMG MORI DMU 50, 2 Mazak Integrex”.',

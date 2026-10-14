@@ -42,6 +42,9 @@ a { color: inherit; }
 .bar__showroom svg { width: 16px; height: 16px; }
 .langsel select { appearance: none; background: transparent; border: 1px solid rgba(255, 255, 255, .3); color: #fff; border-radius: 999px; padding: .4rem .7rem; font-size: .78rem; text-transform: uppercase; }
 .langsel select option { color: #000; }
+/* Währung (assets/js/currency.js): Kürzel, öffnet die Auswahl */
+.cursel { appearance: none; background: transparent; border: 1px solid rgba(255, 255, 255, .3); color: #fff; border-radius: 999px; padding: .4rem .7rem; font: inherit; font-size: .78rem; font-weight: 600; letter-spacing: .06em; cursor: pointer; min-width: 3.6rem; transition: background .25s; }
+.cursel:hover, .cursel[aria-expanded="true"] { background: rgba(255, 255, 255, .14); }
 
 /* ------------------------------------------------------------------ Hauptbereich */
 .main { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr var(--panel-w); }
@@ -424,6 +427,8 @@ details.more summary { cursor: pointer; font-size: .8rem; color: rgba(255, 255, 
 @media (max-width: 560px) {
   .steps { gap: 0; }
   .steps button { padding: .4rem .3rem; }
+  .bar__tools { gap: .3rem; }
+  .cursel, .langsel select { min-width: 0; padding: .38rem .45rem; font-size: .72rem; }
   .bar__logo img { height: 18px; }
   .intro { padding: 1.2rem 1rem; }
   .intro__ex { grid-template-columns: 1fr 1fr; }
@@ -434,6 +439,7 @@ details.more summary { cursor: pointer; font-size: .8rem; color: rgba(255, 255, 
   .fgrid { grid-template-columns: 1fr; }
   .facts3 { grid-template-columns: 1fr 1fr; }
 }
+@media (max-width: 400px) { .steps button { padding: .4rem .18rem; } .bar { gap: .35rem; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
 /* Profil-Zusammenfassung über dem Chat */

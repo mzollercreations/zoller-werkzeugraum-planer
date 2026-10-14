@@ -147,7 +147,7 @@ export default {
   'gain.invest': 'Cena iz ponudbe (neobvezno)', 'gain.investph': 'npr. 180000', 'gain.mode': 'Način izračuna', 'gain.mode.zoller': 'Standard ZOLLER', 'gain.mode.cons': 'Previdno',
   'gain.moded': 'Standard ZOLLER računa kot kalkulator gospodarnosti ZOLLER. Previden izračun upošteva vsak vzvod približno na polovico.',
   'gain.assumptions': 'Vaše predpostavke', 'gain.entries': 'vrednosti na leto, ki se ne tipkajo več', 'gain.staff': 'ur dela na leto se sprosti', 'gain.permachine': 'na stroj in izmeno',
-  'gain.quality': 'Česar ni mogoče izraziti v evrih', 'gain.sources': 'Viri', 'gain.formula': 'Izračun', 'gain.calc15k': 'ZOLLER jamči najmanj 15.000 € na stroj, leto in izmeno – vaš izračun: {v}.',
+  'gain.quality': 'Česar ni mogoče izraziti v denarju', 'gain.sources': 'Viri', 'gain.formula': 'Izračun', 'gain.calc15k': 'ZOLLER jamči najmanj 15.000 € na stroj, leto in izmeno – vaš izračun: {v}.',
   'gain.table': 'Kot preglednica', 'gain.share': 'Delež', 'gain.wait': 'stane vsak delovni dan, ko še proizvajate brez ZOLLER',
   'q2.typos': 'napak pri tipkanju ob stroju', 'q2.length': 'natančnost dolžine pri krčnem vpenjanju', 'q2.balance': 'kakovost uravnoteženja', 'q2.runout': 'opletanje', 'q2.robobox': 'leta povračila (»roboBox«)', 'q2.life': 'življenjska doba po navedbah uporabnikov',
   'q.machines': 'Katere stroje imate v proizvodnji? Dovolj sta proizvajalec in serija – npr. »3 DMG MORI DMU 50, 2 Mazak Integrex«.',

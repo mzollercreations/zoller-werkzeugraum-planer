@@ -42,6 +42,12 @@ const MODEL_BRAND = [
 const MACHINE_WORD = /maschine|machine|bearbeitungszentr|zentren|center|centre|fräs|dreh|lathe|mill|torno|fresadora|baz|vmc|hmc|portal|bohrwerk|karussell/;
 const UNIT_AFTER = /^\s*(-?\s?)?(%|€|eur|euro|usd|\$|schicht|shift|turno|équipe|poste|werkzeug|tool|outil|herramient|tag|day|jour|día|dia|min|sek|sec|std|stunde|hour|h\b|jahr|year|an\b|año|mitarbeit|employee|people|personne|empleado|µm|mm|m\b|m²|qm|u\/min|upm|rpm|1\/min|min-1|kw|kva|t\b|kg|wechsel|change|teile|parts|pièces|piezas|stk\.?\s?(werkzeug|tool)|achs|axis|axe|eje|°)/;
 
+const CUR_W = '€|eur(?:o|os)?\\b|\\$|us\\$|ca\\$|mx\\$|r\\$|usd|dollar\\w*|£|chf|¥|￥|円|元|₩|원|₹|zł|kč|ft\\b|kr\\b|₽|руб\\w*|₺|tl\\b|' +
+  'sek|pln|czk|huf|jpy|cny|rmb|krw|inr|brl|rub|try|cad|mxn|gbp';
+const PER_H = "\\s?(\\/|pro|je|per|an|the|la|por|a l')\\s?(h\\b|std|stunde|hour|hr|heure|hora|時|小时|시간|ч\\b|час|saat|sa\\b|óra|godz|hod|tim)";
+const RATE_NUM_CUR = new RegExp(`(\\d{2,6})\\s?(${CUR_W})${PER_H}`);
+const RATE_CUR_NUM = new RegExp(`(?:${CUR_W})\\s?(\\d{2,6})()${PER_H}`);
+
 function normalize(text) {
   let s = ' ' + text.toLowerCase().replace(/[–—]/g, '-').replace(/[“”„«»]/g, '"').replace(/ /g, ' ') + ' ';
   s = s.replace(/(\d)[.,'’ ](\d{3})(?!\d)/g, '$1$2').replace(/(\d)[.,'’ ](\d{3})(?!\d)/g, '$1$2');   // 2.500 / 2,500 / 2 500
@@ -264,9 +270,9 @@ export function parse(text, ctx = {}) {
   if ((m = s.match(/(werkzeugbestand|bestand|inventory|tool\s?stock)\D{0,22}(\d{2,6})/))) P.tools = +m[2];
   if (!P.tools && (m = s.match(/(\d{2,5})\s?(本|把|개|инструмент|takım|narzędzi|nástroj|szerszám|orodij|utensili|herramientas|ferramentas|verktyg)/))) P.tools = +m[1];
   if (P.tools) hit('tools', P.tools);
-  // Stundensatz
-  if ((m = s.match(/(\d{2,3})\s?(€|eur|euro|\$|usd|dollar|£|chf)\s?(\/|pro|je|per|an|the|la|por|a l')\s?(h\b|std|stunde|hour|hr|heure|hora)/)) ||
-      (m = s.match(/(stundensatz|maschinenstundensatz|hourly\s?rate|machine\s?rate|burden\s?rate|taux\s?horaire|tarifa\s?horaria)\D{0,24}(\d{2,3})/))) {
+  // Stundensatz – in jeder Währung (die Beispiele werden in die Währung des Besuchers umgerechnet: »22.000 ¥/h«, »$135/h«)
+  if ((m = s.match(RATE_NUM_CUR)) || (m = s.match(RATE_CUR_NUM)) ||
+      (m = s.match(/(stundensatz|maschinenstundensatz|hourly\s?rate|machine\s?rate|burden\s?rate|taux\s?horaire|tarifa\s?horaria)\D{0,24}(\d{2,6})/))) {
     P.rate = +(m[2] && /\d/.test(m[2]) ? m[2] : m[1]); hit('rate', P.rate);
   }
   if ((m = s.match(/(\d{2,3})\s?(€|eur|euro|\$)\s?(\/|pro|per)\s?(h|std|stunde|hour)\s?(\w+\s){0,3}(personal|mitarbeiter|staff|labou?r|lohn)/))) P.staff = +m[1];

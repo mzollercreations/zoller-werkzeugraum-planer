@@ -10,6 +10,7 @@
 <link rel="preload" href="assets/fonts/T-Star-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/T-Star-Bold.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/app.css?v=1">
+<script src="assets/js/currency.js?v=1"></script>
 <script type="importmap">{ "imports": { "three": "./assets/vendor/three.module.min.js" } }</script>
 <!--planer-config-->
 </head>
@@ -21,6 +22,7 @@
     <nav class="steps" aria-label="Schritte" data-steps></nav>
     <div class="bar__tools">
       <a class="bar__showroom" data-showroom href="https://mzollercreations.github.io/zoller-produktumgebung-3d/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.8 20 7.4v9.2l-8 4.6-8-4.6V7.4z"/><path d="M4 7.4l8 4.6 8-4.6M12 12v9.2"/></svg><span data-t="ui.showroom">3D-Showroom</span></a>
+      <button class="cursel" type="button" data-currency-btn><span data-currency-code></span></button>
       <div class="langsel"><select data-lang aria-label="Sprache"></select></div>
     </div>
   </header>

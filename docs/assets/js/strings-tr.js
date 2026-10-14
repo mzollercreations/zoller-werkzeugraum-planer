@@ -147,7 +147,7 @@ export default {
   'gain.invest': 'Teklif fiyatınız (isteğe bağlı)', 'gain.investph': 'örn. 180000', 'gain.mode': 'Hesaplama şekli', 'gain.mode.zoller': 'ZOLLER standardı', 'gain.mode.cons': 'Temkinli',
   'gain.moded': 'ZOLLER standardı, ZOLLER verimlilik hesaplayıcısı gibi hesaplar. Temkinli mod her kaldıracı yaklaşık yarısıyla alır.',
   'gain.assumptions': 'Varsayımlarınız', 'gain.entries': 'yılda artık elle girilmeyen değer', 'gain.staff': 'yılda serbest kalan personel saati', 'gain.permachine': 'tezgâh ve vardiya başına',
-  'gain.quality': 'Euro ile ölçülemeyenler', 'gain.sources': 'Kaynaklar', 'gain.formula': 'Hesap', 'gain.calc15k': 'ZOLLER tezgâh, yıl ve vardiya başına en az 15.000 € garanti eder – sizin hesabınız: {v}.',
+  'gain.quality': 'Parayla ölçülemeyenler', 'gain.sources': 'Kaynaklar', 'gain.formula': 'Hesap', 'gain.calc15k': 'ZOLLER tezgâh, yıl ve vardiya başına en az 15.000 € garanti eder – sizin hesabınız: {v}.',
   'gain.table': 'Tablo olarak', 'gain.share': 'Pay', 'gain.wait': 'hâlâ ZOLLER olmadan üretim yaptığınız her iş gününün maliyeti',
   'q2.typos': 'tezgâhta yazım hatası', 'q2.length': 'shrink sırasında boy hassasiyeti', 'q2.balance': 'balans kalitesi', 'q2.runout': 'salgı', 'q2.robobox': 'yıl geri ödeme (»roboBox«)', 'q2.life': 'kullanıcılara göre takım ömrü',
   'q.machines': 'Üretiminizde hangi tezgâhlar var? Marka ve seri yeterli – örn. “3 DMG MORI DMU 50, 2 Mazak Integrex”.',

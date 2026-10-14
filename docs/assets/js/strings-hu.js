@@ -147,7 +147,7 @@ export default {
   'gain.invest': 'Ajánlati ár (opcionális)', 'gain.investph': 'pl. 180000', 'gain.mode': 'Számítási mód', 'gain.mode.zoller': 'ZOLLER-standard', 'gain.mode.cons': 'Óvatos',
   'gain.moded': 'A ZOLLER-standard úgy számol, mint a ZOLLER gazdaságossági kalkulátora. Az óvatos mód minden kart nagyjából felével vesz számításba.',
   'gain.assumptions': 'Az Ön feltételezései', 'gain.entries': 'érték évente, amelyet nem kell begépelni', 'gain.staff': 'munkaóra szabadul fel évente', 'gain.permachine': 'gépenként és műszakonként',
-  'gain.quality': 'Amit nem lehet euróban kifejezni', 'gain.sources': 'Források', 'gain.formula': 'Számítás', 'gain.calc15k': 'A ZOLLER legalább 15 000 €-t garantál gépenként, évente és műszakonként – az Ön számítása: {v}.',
+  'gain.quality': 'Amit nem lehet pénzben kifejezni', 'gain.sources': 'Források', 'gain.formula': 'Számítás', 'gain.calc15k': 'A ZOLLER legalább 15 000 €-t garantál gépenként, évente és műszakonként – az Ön számítása: {v}.',
   'gain.table': 'Táblázatként', 'gain.share': 'Arány', 'gain.wait': 'kerül minden munkanap, amikor még ZOLLER nélkül gyárt',
   'q2.typos': 'elgépelés a gépnél', 'q2.length': 'hosszpontosság zsugorításnál', 'q2.balance': 'kiegyensúlyozási jóság', 'q2.runout': 'ütés', 'q2.robobox': 'év megtérülés (»roboBox«)', 'q2.life': 'éltartam a felhasználók szerint',
   'q.machines': 'Milyen gépek vannak a gyártásában? Elég a gyártó és a sorozat – pl. „3 DMG MORI DMU 50, 2 Mazak Integrex”.',

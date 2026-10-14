@@ -147,7 +147,7 @@ export default {
   'gain.invest': 'Ert offererade pris (valfritt)', 'gain.investph': 't.ex. 180000', 'gain.mode': 'Beräkningssätt', 'gain.mode.zoller': 'ZOLLER-standard', 'gain.mode.cons': 'Försiktig',
   'gain.moded': 'ZOLLER-standard räknar som ZOLLERs lönsamhetskalkylator. Försiktig räknar varje hävstång till ungefär hälften.',
   'gain.assumptions': 'Era antaganden', 'gain.entries': 'värden per år som inte längre skrivs in', 'gain.staff': 'personaltimmar per år som frigörs', 'gain.permachine': 'per maskin och skift',
-  'gain.quality': 'Det som inte går att räkna i euro', 'gain.sources': 'Källor', 'gain.formula': 'Beräkning', 'gain.calc15k': 'ZOLLER garanterar minst 15 000 € per maskin, år och skift – er beräkning: {v}.',
+  'gain.quality': 'Det som inte går att räkna i pengar', 'gain.sources': 'Källor', 'gain.formula': 'Beräkning', 'gain.calc15k': 'ZOLLER garanterar minst 15 000 € per maskin, år och skift – er beräkning: {v}.',
   'gain.table': 'Som tabell', 'gain.share': 'Andel', 'gain.wait': 'kostar varje arbetsdag som ni fortfarande producerar utan ZOLLER',
   'q2.typos': 'inmatningsfel vid maskinen', 'q2.length': 'längdnoggrannhet vid krympning', 'q2.balance': 'balanseringskvalitet', 'q2.runout': 'kast', 'q2.robobox': 'års återbetalning (»roboBox«)', 'q2.life': 'livslängd enligt användare',
   'q.machines': 'Vilka maskiner står i er produktion? Märke och serie räcker – t.ex. ”3 DMG MORI DMU 50, 2 Mazak Integrex”.',

@@ -147,7 +147,7 @@ export default {
   'gain.invest': 'お見積り金額（任意）', 'gain.investph': '例：180000', 'gain.mode': '計算方法', 'gain.mode.zoller': 'ZOLLER 標準', 'gain.mode.cons': '控えめ',
   'gain.moded': 'ZOLLER 標準は ZOLLER 経済性計算ツールと同じ方法で計算します。控えめでは各項目を約半分で見積もります。',
   'gain.assumptions': '前提条件', 'gain.entries': '年間に手入力が不要になる値', 'gain.staff': '年間に生まれる作業時間', 'gain.permachine': '機械 1 台・1 シフトあたり',
-  'gain.quality': 'ユーロでは測れない価値', 'gain.sources': '出典', 'gain.formula': '計算式', 'gain.calc15k': 'ZOLLER は機械 1 台・1 年・1 シフトあたり最低 15,000 € を保証――お客様の計算：{v}。',
+  'gain.quality': 'お金では測れない価値', 'gain.sources': '出典', 'gain.formula': '計算式', 'gain.calc15k': 'ZOLLER は機械 1 台・1 年・1 シフトあたり最低 15,000 € を保証――お客様の計算：{v}。',
   'gain.table': '表で見る', 'gain.share': '割合', 'gain.wait': 'ZOLLER なしで生産を続ける 1 日あたりのコスト',
   'q2.typos': '機械での入力ミス', 'q2.length': '焼きばめ時の長さ精度', 'q2.balance': 'バランス精度', 'q2.runout': '振れ', 'q2.robobox': '年で回収（»roboBox«）', 'q2.life': 'ユーザーによる工具寿命',
   'q.machines': '工場にはどんな機械がありますか？メーカーとシリーズで十分です――例：「DMG MORI DMU 50 を 3 台、Mazak Integrex を 2 台」。',

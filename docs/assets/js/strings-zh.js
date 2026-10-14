@@ -147,7 +147,7 @@ export default {
   'gain.invest': '您的报价金额（可选）', 'gain.investph': '例如 180000', 'gain.mode': '计算方式', 'gain.mode.zoller': 'ZOLLER 标准', 'gain.mode.cons': '保守',
   'gain.moded': 'ZOLLER 标准按 ZOLLER 经济效益计算器的方法计算。保守模式将每项按约一半计入。',
   'gain.assumptions': '您的假设', 'gain.entries': '每年不再手动输入的数值', 'gain.staff': '每年释放的人工小时', 'gain.permachine': '每台机床每班',
-  'gain.quality': '无法用欧元衡量的价值', 'gain.sources': '来源', 'gain.formula': '计算', 'gain.calc15k': 'ZOLLER 保证每台机床每年每班至少 15000 欧元——您的结果：{v}。',
+  'gain.quality': '无法用金钱衡量的价值', 'gain.sources': '来源', 'gain.formula': '计算', 'gain.calc15k': 'ZOLLER 保证每台机床每年每班至少 15000 欧元——您的结果：{v}。',
   'gain.table': '表格形式', 'gain.share': '占比', 'gain.wait': '是您在没有 ZOLLER 的情况下每个工作日的代价',
   'q2.typos': '机床旁的输入错误', 'q2.length': '热缩时的长度精度', 'q2.balance': '平衡精度', 'q2.runout': '跳动', 'q2.robobox': '年回本（»roboBox«）', 'q2.life': '用户反馈的刀具寿命',
   'q.machines': '您的车间有哪些机床？品牌和系列即可——例如“3 台 DMG MORI DMU 50、2 台 Mazak Integrex”。',

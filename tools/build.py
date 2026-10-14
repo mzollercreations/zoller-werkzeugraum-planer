@@ -5,7 +5,8 @@ Je Länderfassung entsteht docs/<sprachcode>/index.html (deutsche Hauptfassung: 
   - Sprache der Oberfläche (assets/js/strings*.js; fehlt eine Sprache, Englisch),
   - Links auf die Produkt- und Quellseiten der jeweiligen Länderseite (über die Zuordnung de_path -> Landespfad,
     dieselbe Logik wie der 3D-Showroom: zoller-produktumgebung-3d/tools/build_locale.py),
-  - Landeswährung und umgerechneten Standardwerten (Stundensätze, Maschinenwerte),
+  - Währung des Landes, in dem der Planer aufgerufen wird (assets/js/currency.js, kopiert aus zoller-webseite:
+    Zeitzone/Browsersprache, Währungs-Knopf, EZB-Kurse, Vorgaben umgerechnet und aufgerundet),
   - E-Mail-Adresse der nationalen ZOLLER-Gesellschaft für »Angebot anfordern«,
   - Link zurück zur Länderseite und in den Showroom derselben Sprache.
 
@@ -31,11 +32,8 @@ SITE_DE = "https://mzollercreations.github.io/zoller-webseite"
 BOOKING = {"de": "https://myzoller.com/de/de/expert/booking", "en-US": "https://myzoller.com/us/en/expert/booking"}
 BOOKING_INT = "https://myzoller.com/int/en/expert/booking/"
 
-# Währung je Länderseite + grober Umrechnungsfaktor für die Standardwerte (der Kunde kann alles ändern)
-CURRENCY = {"de": ("EUR", 1), "at": ("EUR", 1), "es": ("EUR", 1), "fr": ("EUR", 1), "pt": ("EUR", 1), "it": ("EUR", 1),
-            "si": ("EUR", 1), "sk": ("EUR", 1), "ca": ("CAD", 1.5), "us": ("USD", 1.1), "mx": ("MXN", 20), "se": ("SEK", 11.4),
-            "pl": ("PLN", 4.3), "cz": ("CZK", 25), "hu": ("HUF", 395), "cn": ("CNY", 7.9), "jp": ("JPY", 165), "kr": ("KRW", 1500),
-            "in": ("INR", 93), "br": ("BRL", 6), "uk": ("GBP", .85), "ru": ("RUB", 100), "tr": ("TRY", 40)}
+# Währung: nicht mehr je Länderseite fest, sondern nach Standort des Besuchers (assets/js/currency.js, Quelle zoller-webseite)
+CURRENCY_JS = WEB / "assets" / "js" / "currency.js"
 
 TITLE = {"de": "Werkzeugraum-Planer", "en": "Toolroom Planner", "fr": "Planificateur d’outillage", "es": "Planificador de sala de herramientas"}
 DESC = {"de": "Beschreiben Sie Ihre Fertigung – der ZOLLER Werkzeugraum-Planer stellt Ihre Maschinen in eine 3D-Halle, plant den passenden Werkzeugraum aus echten CAD-Daten und rechnet aus, was Sie gewinnen.",
@@ -64,6 +62,7 @@ def ui_langs():
 
 def version():
     files = sorted((DOCS / "assets" / "js").glob("*.js")) + [DOCS / "assets" / "css" / "app.css"]
+    files = [f for f in files if f.name != "currency.js"] + [CURRENCY_JS]
     return hashlib.sha1(b"".join(f.read_bytes() for f in files)).hexdigest()[:10]
 
 
@@ -88,10 +87,12 @@ def page(cfg, lang, base, ver):
     if base:   # <base> muss vor allen Links, Stilen und der Import-Map stehen
         t = t.replace('<meta charset="utf-8">', f'<meta charset="utf-8">\n<base href="{base}">', 1)
     t = t.replace("<!--planer-config-->", f"<script>window.PLANER = {json.dumps(cfg, ensure_ascii=False, separators=(',', ':'))};</script>")
-    t = re.sub(r'(assets/(?:css/app\.css|js/app\.js))\?v=\w+', rf'\1?v={ver}', t)
+    t = re.sub(r'(assets/(?:css/app\.css|js/app\.js|js/currency\.js))\?v=\w+', rf'\1?v={ver}', t)
     # alle Module mit Versionsnummer laden (Import-Map), damit nach einem Update keine alten Dateien aus dem Cache kommen
     imports = {"three": f"./assets/vendor/three.module.min.js?v={ver}"}
     for f in sorted((DOCS / "assets" / "js").glob("*.js")) + sorted((DOCS / "assets" / "vendor").glob("*.js")):
+        if f.name == "currency.js":
+            continue   # klassisches Skript im <head>, kein Modul
         rel = f.relative_to(DOCS).as_posix()
         imports["./" + rel] = f"./{rel}?v={ver}"
     t = re.sub(r'<script type="importmap">.*?</script>', '<script type="importmap">' + json.dumps({"imports": imports}) + '</script>', t, flags=re.S)
@@ -102,12 +103,12 @@ def main():
     sites = json.loads((WEB / "content" / "sites.json").read_text(encoding="utf-8"))
     prod_paths, fact_paths = js_paths()
     langs = ui_langs()
+    (DOCS / "assets" / "js" / "currency.js").write_bytes(CURRENCY_JS.read_bytes())
     ver = version()
     en_int = next(BL.Locale(s, l) for s in sites.values() for l in s["locales"] if l["src"] == "en_DE" and not l.get("overlay"))
     BL.EN_INT = en_int
     made = []
     for sid, site in sites.items():
-        cur, fx = CURRENCY.get(sid, ("EUR", 1))
         for loc in site["locales"]:
             code = loc["code"]
             folder = "" if not loc["src"] else code.lower() + "/"
@@ -133,14 +134,14 @@ def main():
                 "siteUrl": site_url, "showroom": SHOWROOM + folder, "planer": PLANER + folder,
                 "mail": co.get("email", "info@zoller.info"), "company": co.get("name", "ZOLLER"),
                 "expert": BOOKING.get(code, BOOKING["de"] if loc["lang"] == "de" else BOOKING_INT),
-                "currency": cur, "fx": fx, "langs": list(lang_map), "locales": lang_map,
+                "langs": list(lang_map), "locales": lang_map,
                 "links": {k: web(v) for k, v in prod_paths.items() if v and web(v)},
                 "factLinks": {k: web(v) for k, v in fact_paths.items() if web(v)},
             }
             out = DOCS / folder / "index.html"
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(page(cfg, ui, "../" if folder else "", ver), encoding="utf-8")
-            made.append(f"{folder or '/'} ({ui}, {cur}, {len(cfg['links'])} Produktlinks)")
+            made.append(f"{folder or '/'} ({ui}, {len(cfg['links'])} Produktlinks)")
     print("Planer:", ", ".join(made))
 
 

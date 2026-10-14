@@ -147,7 +147,7 @@ export default {
   'gain.invest': 'Il suo prezzo d’offerta (facoltativo)', 'gain.investph': 'ad es. 180000', 'gain.mode': 'Modalità di calcolo', 'gain.mode.zoller': 'Standard ZOLLER', 'gain.mode.cons': 'Prudente',
   'gain.moded': 'Lo standard ZOLLER calcola come il calcolatore di redditività ZOLLER. La modalità prudente considera ogni leva circa a metà.',
   'gain.assumptions': 'Le sue ipotesi', 'gain.entries': 'valori all’anno non più digitati', 'gain.staff': 'ore di personale liberate all’anno', 'gain.permachine': 'per macchina e turno',
-  'gain.quality': 'Ciò che non si misura in euro', 'gain.sources': 'Fonti', 'gain.formula': 'Calcolo', 'gain.calc15k': 'ZOLLER garantisce almeno 15.000 € per macchina, anno e turno; il suo calcolo: {v}.',
+  'gain.quality': 'Ciò che non si misura in denaro', 'gain.sources': 'Fonti', 'gain.formula': 'Calcolo', 'gain.calc15k': 'ZOLLER garantisce almeno 15.000 € per macchina, anno e turno; il suo calcolo: {v}.',
   'gain.table': 'Come tabella', 'gain.share': 'Quota', 'gain.wait': 'costa ogni giorno lavorativo in cui produce ancora senza ZOLLER',
   'q2.typos': 'errori di digitazione in macchina', 'q2.length': 'precisione di lunghezza nel calettamento', 'q2.balance': 'qualità di equilibratura', 'q2.runout': 'concentricità', 'q2.robobox': 'anni di ammortamento (»roboBox«)', 'q2.life': 'durata secondo gli utenti',
   'q.machines': 'Quali macchine ha in produzione? Bastano marca e serie, ad es. «3 DMG MORI DMU 50, 2 Mazak Integrex».',

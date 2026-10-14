@@ -27,28 +27,47 @@ function plural(n, f) {
   if (c === 'few') return f[f.length - 2];
   return f[f.length - 1];
 }
+// Beträge in den Texten stehen in Euro. In anderer Währung werden feste Beträge umgerechnet und aufgerundet
+// (»Stundensatz 120 €/h« -> »135 $/h«, 15.000 € = 200 h × 75 €/h), sonst nur das Zeichen ersetzt (»{v} €/h«).
+// Belegte Fakten aus Anwenderberichten (fact.*) behalten ihre Originalwährung – außer der ZOLLER-Garantie calc15k.
+const MONEY_TXT = /€\s?(\d{1,3}(?:[.,\u00a0\u202f ]\d{3})+|\d+)|(\d{1,3}(?:[.,\u00a0\u202f ]\d{3})+|\d+)\s?€/g;
 export function t(key, p = {}) {
   let s = STR[LANG]?.[key] ?? STR.en?.[key] ?? STR.de[key] ?? key;
-  if (CUR !== 'EUR' && !key.startsWith('fact.') && key !== 'gain.calc15k') s = s.replace(/€/g, SYM);
+  if (CUR !== 'EUR' && key === 'gain.investph' && Z) s = s.replace(/\d+/, (d) => String(Z.amount(+d, CUR)));   // »z. B. 180000«
+  if (CUR !== 'EUR' && (!key.startsWith('fact.') || key === 'fact.calc15k')) {
+    s = s.replace(MONEY_TXT, (m, a, b) => {
+      const eur = +(a || b).replace(/\D/g, '');
+      return Z ? Z.money(eur, CUR, eur === 15000 ? 75 : 0) : m;
+    }).replace(/€/g, () => SYM);
+  }
   s = s.replace(/\{(\w+)((?:\|[^|}]*){2,4})\}/g, (m, k, f) => plural(+p[k], f.slice(1).split('|')));
   return s.replace(/\{(\w+)\}/g, (m, k) => (p[k] !== undefined ? (typeof p[k] === 'number' ? fmt(p[k]) : p[k]) : m));
 }
 const LOC = CFG.locale || (LANG === 'de' ? 'de-DE' : LANG);
-const CUR = CFG.currency || 'EUR', FX = CFG.fx || 1;
+// Währung: Land, in dem der Planer aufgerufen wird, oder die Wahl am Währungs-Knopf (assets/js/currency.js, gemeinsam
+// mit der ZOLLER-Webseite). FX = Euro-Kurs für eigene Eingaben; Vorgaben rechnet ZCurrency.amount um und rundet auf.
+const Z = window.ZCurrency;
+Z?.setLocale(LOC);
+let CUR, FX, CF, CFK, SYM;
+function useCurrency(code) {
+  CUR = code; FX = Z?.rates[code] || 1;
+  CF = new Intl.NumberFormat(LOC, { style: 'currency', currency: CUR, maximumFractionDigits: 0 });
+  CFK = new Intl.NumberFormat(LOC, { style: 'currency', currency: CUR, notation: 'compact', maximumFractionDigits: 2 });
+  SYM = CF.formatToParts(0).find((x) => x.type === 'currency')?.value || CUR;
+}
+useCurrency(Z ? Z.get() : 'EUR');
 const NF = new Intl.NumberFormat(LOC, { maximumFractionDigits: 0 });
 const NF1 = new Intl.NumberFormat(LOC, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
-const CF = new Intl.NumberFormat(LOC, { style: 'currency', currency: CUR, maximumFractionDigits: 0 });
-const CFK = new Intl.NumberFormat(LOC, { style: 'currency', currency: CUR, notation: 'compact', maximumFractionDigits: 2 });
 const PC = { y: '#f0e600', yd: '#c9bf00', ink: '#111214', g: '#8a9096', gl: '#d9dcdf', gx: '#eef0f1', red: '#e2552f', amber: '#f2a900', green: '#1f9d55' };
-const SYM = CF.formatToParts(0).find((x) => x.type === 'currency')?.value || '€';
-const nice = (v) => { const x = v * FX; const m = Math.pow(10, Math.max(0, Math.floor(Math.log10(x)) - 1)); return Math.round(x / m) * m; };
+const nice = (v) => (Z ? Z.amount(v, CUR) : v);
+const freshProfile = () => defaultProfile(FX, Z ? nice : null);
 const fmt = (n) => NF.format(Math.round(n));
 const eur = (n) => { const r = Math.pow(10, Math.max(0, Math.floor(Math.log10(Math.abs(n) || 1)) - 2)); return CF.format(Math.round(n / r) * r); };
 const eurExact = (n) => CF.format(Math.round(n));
 
 // ------------------------------------------------------------------ Zustand
 const S = {
-  step: 'intro', profile: defaultProfile(FX), chat: [], queue: [], asked: new Set(), items: [], gain: null, hall: null,
+  step: 'intro', profile: freshProfile(), chat: [], queue: [], asked: new Set(), items: [], gain: null, hall: null,
   cad: new Map(),        // Maschinen-ID -> eigenes CAD-Modell (Object3D), nur im Browser
   first: true, mode: 'after',
 };
@@ -71,6 +90,7 @@ async function init() {
   const sel = $('[data-lang]');
   sel.innerHTML = CFG.langs.map((l) => `<option value="${l}"${l === LANG ? ' selected' : ''}>${l.toUpperCase()}</option>`).join('');
   sel.addEventListener('change', () => { location.href = BASE + (CFG.locales[sel.value] ?? '') + location.search + location.hash; });
+  if (Z) window.addEventListener(Z.event, () => switchCurrency(Z.get()));
   // Schritte
   $('[data-steps]').innerHTML = STEP_IDS.map((s, i) => `<button type="button" data-go="${s}"><b>${i + 1}</b><span>${t('s' + (i + 1))}</span></button>`).join('');
   $('[data-steps]').addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b && !b.disabled) go(b.dataset.go); });
@@ -120,7 +140,8 @@ async function init() {
   if (h) {
     try {
       const o = await decodeState(h[1]);
-      S.profile = unpack(o, FX); S.profile.fx = FX; S.first = false;
+      S.profile = unpack(o, FX, Z ? nice : null); S.profile.fx = FX; S.first = false;
+      if (o.cur && o.cur !== CUR && Z?.rates[o.cur]) convertProfile(S.profile, o.cur, CUR, o.known || []);   // Link aus einem anderen Land
       recompute(); startChat(true);
       if (/[#&]ar=1/.test(location.hash)) { go('room'); setTimeout(arHandoff, 600); } else go('solution');
     } catch (e) { console.warn('Link konnte nicht gelesen werden', e); }
@@ -144,7 +165,7 @@ function liveParse(text) {
   $('[data-hits]').innerHTML = hitChips(r).join('');
   // die Halle reagiert schon beim Tippen
   if (S.step === 'intro' && S.hall) {
-    const p = defaultProfile(FX); apply(p, r, newMachine, true);
+    const p = freshProfile(); apply(p, r, newMachine, true);
     const n = p.machines.reduce((a, m) => a + m.count, 0);
     S.preview = p; schedulePlan(p, []);
     if (n !== S.previewN) { S.previewN = n; S.hall.setAutoRotate(false); setTimeout(() => { S.hall.view(n ? 'hall' : 'overview'); setTimeout(() => S.step === 'intro' && S.hall.setAutoRotate(true), 1500); }, 250); }
@@ -248,6 +269,26 @@ function replyFor(k) {
   return [];
 }
 function know(f) { if (!S.profile.known.includes(f)) S.profile.known.push(f); }
+
+// Geldwerte des Profils in eine andere Währung: Vorgaben neu aus Euro (aufgerundet), eigene Angaben zum Kurs
+function convertProfile(p, from, to, known = p.known) {
+  const k = (v) => Math.round(v / (Z.rates[from] || 1) * (Z.rates[to] || 1));
+  const d = freshProfile();   // Vorgaben in der neuen Währung (CUR ist schon umgestellt)
+  for (const f of ['rate', 'staff']) p[f] = known.includes(f) ? k(p[f]) : d[f];
+  if (p.invest) p.invest = k(p.invest);
+  p.machines.forEach((m) => { if (m.value) m.value = k(m.value); });
+  p.fx = Z.rates[to] || 1;
+}
+function switchCurrency(code) {
+  if (!Z || code === CUR || !Z.rates[code]) return;
+  const from = CUR;
+  useCurrency(code);
+  convertProfile(S.profile, from, code);
+  $$('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
+  $$('[data-tp]').forEach((el) => { el.placeholder = t(el.dataset.tp); });
+  if (S.step === 'intro') liveParse($('[data-prompt-text]')?.value || '');
+  recompute(); render();
+}
 
 function onReply(mi, ri) {
   const m = S.chat[mi]; if (!m || !m.replies || m.answered) return;
@@ -841,7 +882,7 @@ async function decodeState(str) {
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 async function shareUrl() {
-  const h = await encodeState(pack(S.profile));
+  const h = await encodeState({ ...pack(S.profile), cur: CUR });
   const u = location.href.split('#')[0] + '#p=' + h;
   history.replaceState(null, '', '#p=' + h);
   return u;
