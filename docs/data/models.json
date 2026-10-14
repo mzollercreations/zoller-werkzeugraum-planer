@@ -380,5 +380,31 @@
    "whitealu",
    "yellow"
   ]
+ },
+ "toolcart": {
+  "id": "toolcart",
+  "file": "models/toolcart.glb",
+  "screen": null,
+  "size": [
+   0.919,
+   0.971,
+   0.564
+  ],
+  "tris": 69996,
+  "classes": [
+   "bellows",
+   "blackplastic",
+   "brushed",
+   "darkgrey",
+   "glossblack",
+   "steel",
+   "worktop",
+   "yellow"
+  ],
+  "ar": {
+   "file": "ar/toolcart.usdc",
+   "tex": [],
+   "tris": 93044
+  }
  }
 }

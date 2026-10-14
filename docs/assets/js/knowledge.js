@@ -160,7 +160,7 @@ export const PRODUCTS = {
   zidcode40:      { step: 'identify', cad: 'zidcode', img: 'zidcode', path: '/produkte/toolmanagement/zidcode/zidcode-40', showroom: 'zidcode', foot: [0.45, 0.5], perMachine: true },
   idchip:         { step: 'identify', img: 'idchip', h: .5, path: '/produkte/werkzeugaufnahmen/idchip', showroom: 'idchip', virtual: true },
   idlabel:        { step: 'identify', img: 'idchip', h: .5, path: '/produkte/werkzeugaufnahmen/idchip', showroom: 'idchip', virtual: true },
-  toolcart:       { step: 'supply', img: 'toolcart', h: .985, path: '/produkte/toolmanagement/smart-cabinets/toolcart', showroom: 'toolcart', foot: [1.05, 0.66] },
+  toolcart:       { step: 'supply', cad: 'toolcart', img: 'toolcart', h: .97, path: '/produkte/toolmanagement/smart-cabinets/toolcart', showroom: 'toolcart', foot: [0.92, 0.56] },
   loadbox:        { step: 'supply', img: 'loadbox', h: 2.2, path: '/produkte/automation/werkzeugbereitstellung/loadbox', showroom: 'loadbox', foot: [3.64, 3.4] },
   coramachineload:{ step: 'supply', img: 'coramachineload', h: 2.1, path: '/produkte/automation/werkzeuglogistik/coramachineload', showroom: 'coramachineload', foot: [2.6, 1.6], atMachine: true },
   coralogistic:   { step: 'supply', img: 'coralogistic', h: 1.4, path: '/produkte/automation/werkzeuglogistik/coralogistic', showroom: 'coralogistic', foot: [1.6, 1.0] },

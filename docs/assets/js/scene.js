@@ -33,6 +33,7 @@ const CLS = {
   glossblack: { color: '#0d0e10', roughness: .16, clearcoat: 1, clearcoatRoughness: .03 }, zinc: { color: '#9da6ab', roughness: .33, metalness: 1 },
   red: { color: '#c8140f', roughness: .3, clearcoat: .5 }, chrome: { color: '#9a9e9c', roughness: .12, metalness: .95 },
   teal: { color: '#1fa58a', roughness: .4 }, blue: { color: '#1a3fae', roughness: .35, clearcoat: .4 },
+  brushed: { color: '#c3c6c7', roughness: .4, metalness: .6 },      // »toolCart«-Gestell (gebürstet, CAD: verzinkt)
   led: { color: '#3ccf6a', roughness: .3, emissive: '#22c55e', emissiveIntensity: 1.6 },
 };
 

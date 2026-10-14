@@ -36,6 +36,7 @@ DEVICES = {
     "redomatic600":   ("XXXXXXX_752865_ZOLLER »redomatic 600«.glb", "screen_pilot4_measure.png", 90000),
     "powershrink400": ("XXXXXXX_752398_ZOLLER »powerShrink 400«.glb", "screen_pilot4_contour.png", 52000),
     "toolbalancer":   ("XXXXXXX_720749_ZOLLER »toolBalancer«.glb", "screen_pilot4_contour.png", 80000),
+    "toolcart":       ("XXXXXXX_740892_ZOLLER »toolCart 750«.glb", None, 70000),
     # leichte Fassung für die Stationen an jeder Maschine (bis zu 60 Stück in einer Halle, ab ~12 m Abstand)
     "zidcode_lo":     ("XXXXXXX_717076_ZOLLER »zidCode«.glb", "screen_zid_scan.png", 9000),
 }
@@ -49,9 +50,18 @@ SCREEN_LIFT = .0015          # Bildschirm 1,5 mm vor das Gehäuse, sonst flacker
 # Dreiecke) -> weglassen: Bauteile, deren Hüllquader ganz im Hüllquader eines großen Teils liegt (Abstand in m)
 INTERIOR_DROP = {"keeper": .012}
 KEEP_FACES, KEEP_SIZE = 300, .2      # Teile mit höchstens so vielen Dreiecken und mindestens dieser Größe (m) bleiben unvereinfacht
+# Drehung um die Hochachse (Grad), damit die Schauseite nach +Z zeigt: der »toolCart« steht im CAD mit der Stirnwand vorn,
+# gezeigt wird wie auf den Produktfotos (und auf der Webseite) die Längsseite mit Schriftzug, Griff rechts
+ROT_Y = {"toolcart": -90}
+# Materialklasse je Gerät umdeuten: »toolCart«-Gestell und Rahmen sind im CAD »verzinkt«, auf den Fotos hell gebürstet
+CLASS_MAP = {"toolcart": {"zinc": "brushed"}}
+# »toolCart«: Materialgruppen mit Logo, Schriftzug, Lochmuster und Rädern bleiben ganz, ebenso große Teile (Raumdiagonale
+# in m) – die Seitenwände mit Lochraster; vereinfacht werden nur Werkzeugwechselrahmen und die 72 Werkzeugeinsätze
+KEEP_CLS = {"toolcart": {"darkgrey", "glossblack", "steel", "bellows", "worktop"}}
+KEEP_BIG = {"toolcart": 1.0}
 # AR (iPhone/iPad Quick Look): eigene, leichtere Fassung je Gerät als USDC, Dreiecks-Budget
 AR_BUDGET = {"keeper": 50000, "toolstation": 34000, "toolorganizer": 16000, "zidcode": 9000, "redomatic600": 34000,
-             "toolbalancer": 26000, "powershrink400": 22000}
+             "toolbalancer": 26000, "powershrink400": 22000, "toolcart": 40000}
 AR_DEFAULT = 24000
 AR_LO = {"zidcode", "toolstation", "toolorganizer"}      # bei diesen Geräten dürfen auch Ränder vereinfacht werden
 AR_OUT = os.path.join(ROOT, "docs", "ar")
@@ -75,7 +85,7 @@ FALLBACK = dict(darkgrey="#35383b", whitealu="#a9acab", yellow="#f0dc00", blackp
                 anodized="#1e2124", steel="#b9bdc0", whiteplastic="#e6e4dc", paper="#e0ded6", wood="#c8a679",
                 worktop="#232426", bellows="#18191b", blackoxide="#2a2826", brass="#c9a14a", glossblack="#0d0e10",
                 zinc="#9da6ab", red="#c8140f", chrome="#9a9e9c", teal="#1fa58a", blue="#1a3fae", screen="#050506",
-                led="#3ccf6a")
+                led="#3ccf6a", brushed="#c3c6c7")
 
 
 def classify(mat):
@@ -251,8 +261,12 @@ def collect(dev, budget, lo=False):
     if file not in _PARTS:
         _PARTS[file] = read_parts(os.path.join(CAD, "original", file))
     parts = _PARTS[file]
-    allp = np.vstack([p[1] for p in parts]) * .001
     base = dev.replace("_lo", "")
+    if base in ROT_Y:
+        a = np.radians(ROT_Y[base])
+        R = np.array([[np.cos(a), 0, np.sin(a)], [0, 1, 0], [-np.sin(a), 0, np.cos(a)]])
+        parts = [(mat, pts @ R.T, fc, node) for mat, pts, fc, node in parts]
+    allp = np.vstack([p[1] for p in parts]) * .001
     if base in INTERIOR_DROP:
         parts = drop_interior(parts, INTERIOR_DROP[base])
     mn, mx = allp.min(0), allp.max(0)
@@ -264,6 +278,7 @@ def collect(dev, budget, lo=False):
     for mat, pts, fc, node in parts:
         p = pts * .001 + off
         c = classify(mat)
+        c = CLASS_MAP.get(base, {}).get(c, c)
         if dev in SCREEN_WHITE and mat is not None and mat.name is None and mat.pbrMetallicRoughness \
                 and min(mat.pbrMetallicRoughness.baseColorFactor[:3]) > .99:
             c = "screen"
@@ -278,7 +293,8 @@ def collect(dev, budget, lo=False):
             screens.append((p, fc))
             continue
         # einfache, große Teile (Gehäusekästen, Platten) nicht vereinfachen – sonst fallen sie bei kleinem Budget ganz weg
-        keep = len(fc) <= KEEP_FACES and np.linalg.norm(np.ptp(p, 0)) >= KEEP_SIZE
+        diag = np.linalg.norm(np.ptp(p, 0))
+        keep = (len(fc) <= KEEP_FACES and diag >= KEEP_SIZE) or c in KEEP_CLS.get(base, ()) or diag >= KEEP_BIG.get(base, 1e9)
         groups.setdefault(c, []).append((p, fc, keep))
     kept = sum(len(f) for g in groups.values() for _, f, k in g if k)
     tri_total = sum(len(f) for g in groups.values() for _, f, k in g if not k)
@@ -327,7 +343,7 @@ def build(dev):
     tris = sum(len(p["idx"]) for p in prims)
     print(f"{dev:15s} {cad_tris:>8d} -> {tris:>7d} Dreiecke, {len(prims):2d} Materialien, "
           f"{os.path.getsize(os.path.join(OUT, dev + '.glb')) / 1024:7.0f} KB, {size[0]:.2f}×{size[2]:.2f}×{size[1]:.2f} m  ({time.time() - t0:.1f}s)")
-    man = dict(id=dev, file=f"models/{dev}.glb", screen=f"models/tex/{os.path.splitext(screen_img)[0]}.webp",
+    man = dict(id=dev, file=f"models/{dev}.glb", screen=f"models/tex/{os.path.splitext(screen_img)[0]}.webp" if screen_img else None,
                size=[round(float(size[0]), 3), round(float(size[1]), 3), round(float(size[2]), 3)], tris=int(tris),
                classes=sorted({p["cls"] for p in prims}))
     if not dev.endswith("_lo"):
@@ -345,6 +361,7 @@ AR_MAT = dict(
     blackoxide=("#2a2826", .35, .9, 0), brass=("#c9a14a", .25, 1, 0), glossblack=("#0d0e10", .16, 0, 1),
     zinc=("#9da6ab", .33, 1, 0), red=("#c8140f", .3, 0, .5), chrome=("#9a9e9c", .12, .95, 0),
     teal=("#1fa58a", .4, 0, 0), blue=("#1a3fae", .35, 0, .4), led=("#3ccf6a", .3, 0, 0),
+    brushed=("#c3c6c7", .4, .6, 0),
 )
 
 
@@ -503,7 +520,7 @@ def write_glb(path, prims):
 
 def textures():
     os.makedirs(os.path.join(OUT, "tex"), exist_ok=True)
-    for f in sorted({d[1] for d in DEVICES.values()} | {"screen_zid_data.png"}):
+    for f in sorted({d[1] for d in DEVICES.values() if d[1]} | {"screen_zid_data.png"}):
         im = Image.open(os.path.join(CAD, "textures", f)).convert("RGB")
         im.thumbnail((1024, 1024), Image.LANCZOS)
         im.save(os.path.join(OUT, "tex", os.path.splitext(f)[0] + ".webp"), quality=86, method=6)
