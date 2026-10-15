@@ -62,17 +62,24 @@ Alle Belege stehen in `docs/assets/js/knowledge.js` (`FACTS`, mit Pfad der Quell
 | `docs/assets/js/strings.js` | Texte DE + EN (weitere Sprachen: `strings-<sprache>.js`) |
 | `docs/models/*.glb` | CAD-Modelle, erzeugt von `tools/build_models.py` aus `~/Claude/ZOLLER/cad/original` |
 | `docs/ar/*.usdc` | dieselben Geräte für AR Quick Look (zweiseitige Flächen, Bildschirme als Leuchtbild), ebenfalls aus `build_models.py` |
+| `docs/models/lod/*.glb` | leichte Fernfassungen (`tools/build_lod.py`, je Gerät per Sichtvergleich eingestellt; ohne redomatic, toolBalancer, powerShrink – deren Netze zerfallen beim Vereinfachen). Der Messestand-Planer übernimmt sie |
 | `tools/test_nlu.py`, `tools/test_expert.py` | Tests: Beispieltexte aller Sprachen, Maschinenarten, Fachfragen in 18 Sprachen |
 | `tools/build.py` | Länderfassungen (Links, Währung, Mailadresse) aus `zoller-webseite/content/sites.json` |
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install numpy DracoPy pygltflib pyfqmr pillow usd-core
 .venv/bin/python tools/build_models.py     # CAD -> docs/models + docs/ar (nur bei neuen/geänderten CAD-Dateien)
+.venv/bin/python tools/build_lod.py        # danach: Fernfassungen -> docs/models/lod + docs/data/lod.json
 python3 tools/build.py                     # Länderfassungen + Versionsnummern
 python3 tools/check_strings.py             # alle Sprachen vollständig, Platzhalter stimmen
 python3 -m http.server 8792 --directory docs &
 ~/Claude/ZOLLER/video/.venv/bin/python tools/test_nlu.py && ~/Claude/ZOLLER/video/.venv/bin/python tools/test_expert.py
 ```
+
+**3D-Leistung (Handy/iPad):** Fernfassung, bis ein Gerät groß im Bild ist (Bild, GLB, PDF immer voll); Materialklassen als
+Vertex-Attribute (2 Draw-Calls je Gerät, ~6 je Kundenmaschine); Werkzeugfluss und Signalsäulen ohne Kamerabewegung mit
+30 Bildern/s, ohne Bewegung gar nicht; Auflösung passt sich der Bildrate an; unter der Gewinn-Seite wird nicht gezeichnet.
+Geräte-Objekte nie in `userData` legen: `clone()` und der GLB-Export serialisieren sie als JSON.
 
 Neue Texte gehören in `docs/assets/js/strings.js` bzw. die Sprachdateien, Änderungen an der Seite in
 `tools/index.template.html` (daraus entstehen alle `index.html`).

@@ -62,7 +62,7 @@ a { color: inherit; }
 /* Beschriftung in der Halle */
 .labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .labels.is-off { display: none; }
-.tag { position: absolute; left: 0; top: 0; pointer-events: auto; display: flex; align-items: center; gap: .45rem; border: 0; text-align: left; padding: .38rem .7rem .38rem .38rem; border-radius: 999px; background: rgba(255, 255, 255, .94); box-shadow: 0 6px 18px -8px rgba(0, 0, 0, .45); font-size: .72rem; line-height: 1.2; color: var(--ink2); white-space: nowrap; transition: opacity .25s; will-change: transform; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.tag { position: absolute; left: 0; top: 0; pointer-events: auto; display: flex; align-items: center; gap: .45rem; border: 0; text-align: left; padding: .38rem .7rem .38rem .38rem; border-radius: 999px; background: rgba(255, 255, 255, .94); box-shadow: 0 6px 18px -8px rgba(0, 0, 0, .45); font-size: .72rem; line-height: 1.2; color: var(--ink2); white-space: nowrap; transition: opacity .25s; will-change: transform; }
 .tag b { width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--yellow); color: var(--black); display: grid; place-items: center; font-size: .78rem; flex: none; }
 .tag span { display: flex; flex-direction: column; }
 .tag em { font-style: normal; font-weight: 700; color: var(--ink); font-size: .74rem; }
@@ -74,7 +74,7 @@ a { color: inherit; }
 
 .hud { position: absolute; left: 1rem; right: 1rem; top: 1rem; display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; pointer-events: none; z-index: 4; }
 .hud > * { pointer-events: auto; }
-.seg { display: inline-flex; background: rgba(0, 0, 0, .82); border-radius: 999px; padding: 3px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.seg { display: inline-flex; background: rgba(0, 0, 0, .86); border-radius: 999px; padding: 3px; }   /* kein backdrop-filter über der 3D-Fläche: kostet auf iOS in jedem Bild */
 .seg button { border: 0; background: transparent; color: rgba(255, 255, 255, .75); padding: .5rem 1rem; border-radius: 999px; font-size: .82rem; font-weight: 500; transition: background .25s, color .25s; }
 .seg button.is-on { background: var(--yellow); color: var(--black); }
 .hud__views { display: flex; gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }

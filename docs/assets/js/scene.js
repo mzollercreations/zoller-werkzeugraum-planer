@@ -7,7 +7,8 @@ import { OrbitControls } from '../vendor/OrbitControls.js';
 import { GLTFLoader } from '../vendor/GLTFLoader.js';
 import { DRACOLoader } from '../vendor/DRACOLoader.js';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import { buildMachine, setMachineState, oldShelf, oldBench, screenTexture } from './machines.js';
+import { mergeGeometries } from '../vendor/BufferGeometryUtils.js';
+import { buildMachine, setMachineState, oldShelf, oldBench, screenTexture, packAttrs, packMat, unpackMesh } from './machines.js';
 import { PRODUCTS, STEPS } from './knowledge.js';
 
 const WALL_Z = -6;
@@ -16,6 +17,7 @@ const YELLOW = 0xf0e600;
 const LINE_ORDER = ['inspect', 'store', 'assemble', 'shrink', 'balance', 'measure', 'supply'];
 const MACHINE_ORDER = ['5ax', 'vmc', 'hmc', 'turnmill', 'lathe', 'swiss', 'multispindle', 'vtl', 'grinder', 'gear', 'boring', 'gantry', 'other'];
 const ZID_NEAR = 14;          // ab diesem Abstand (m) zeigt die Halle die leichte »zidCode«-Fassung
+const AMBIENT_FPS = 30;       // Werkzeugfluss und blinkende Signalsäulen ohne Kamerabewegung: 30 Bilder/s reichen
 const ease = (t) => 1 - Math.pow(1 - t, 3);
 const easeIO = (t) => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const easeBack = (t) => { const c = 1.5; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
@@ -119,8 +121,12 @@ export class Hall {
     this.templates = new Map(); this.photoTex = new Map(); this.zids = [];
     this.canvas = el.querySelector('canvas');
     this.labelLayer = el.querySelector('[data-labels]');
+    this.touch = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
     const r = this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: false });
+    // Auflösung: stehendes Bild voll scharf (maxPR); in Bewegung und beim Werkzeugfluss ein Pixelbudget, das sich der
+    // Bildrate anpasst (adapt)
     this.maxPR = Math.min(window.devicePixelRatio || 1, 2); this.pr = this.maxPR;
+    this.motionPx = this.touch ? 9e5 : 2.2e6; this.ambientPx = Infinity;
     r.setPixelRatio(this.pr);
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = .92;
@@ -137,12 +143,12 @@ export class Hall {
     const c = this.controls = new OrbitControls(this.camera, this.canvas);
     c.enableDamping = true; c.dampingFactor = .08; c.maxPolarAngle = 1.42; c.minDistance = 1.6; c.maxDistance = 220;
     c.screenSpacePanning = true; c.target.set(10, 0, 0);
-    c.addEventListener('change', () => this.kick());
+    c.addEventListener('change', () => { this.moved = true; this.kick(); });
     c.addEventListener('start', () => { this.stopTour(); this.camAnim = null; this.lastView = null; c.autoRotate = false; });
     // Licht
     sc.add(new THREE.HemisphereLight(0xffffff, 0xcfc8bb, .85));
     const sun = this.sun = new THREE.DirectionalLight(0xfff4e2, 2.1);
-    sun.castShadow = true; const sm = window.innerWidth > 900 ? 4096 : 2048; sun.shadow.mapSize.set(sm, sm);
+    sun.castShadow = true; const sm = window.innerWidth > 900 && !this.touch ? 4096 : 2048; sun.shadow.mapSize.set(sm, sm);
     sun.shadow.bias = -.0005; sun.shadow.normalBias = .035;
     sc.add(sun); sc.add(sun.target);
     const fill = new THREE.DirectionalLight(0xe8f0ff, .55); fill.position.set(40, 20, -30); sc.add(fill);
@@ -160,7 +166,8 @@ export class Hall {
     this.gltf = new GLTFLoader(); this.gltf.setDRACOLoader(draco);
     this.texLoader = new THREE.TextureLoader();
     this.lib = {};
-    for (const [k, v] of Object.entries(CLS)) this.lib[k] = new THREE.MeshPhysicalMaterial({ ...v, color: new THREE.Color(v.color), ...(v.emissive ? { emissive: new THREE.Color(v.emissive) } : {}), side: THREE.DoubleSide });   // CAD-Flächen sind nicht einheitlich orientiert
+    // CAD-Flächen sind nicht einheitlich orientiert → zweiseitig; Klarlack braucht den teureren Physical-Shader
+    for (const [k, v] of Object.entries(CLS)) this.lib[k] = new (v.clearcoat ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial)({ ...v, color: new THREE.Color(v.color), ...(v.emissive ? { emissive: new THREE.Color(v.emissive) } : {}), side: THREE.DoubleSide });
     // Interaktion
     this.ray = new THREE.Raycaster();
     let down = null;
@@ -170,12 +177,13 @@ export class Hall {
       const hit = this.pick(e); if (hit && this.opt.onPick) this.opt.onPick(hit);
     });
     this.canvas.addEventListener('pointermove', (e) => {
-      if (e.pointerType !== 'mouse' || e.buttons) return;
+      if (e.pointerType !== 'mouse' || e.buttons || e.timeStamp - (this.hoverT || 0) < 60) return;
+      this.hoverT = e.timeStamp;
       const h = this.pick(e); this.canvas.style.cursor = h ? 'pointer' : '';
     });
     new ResizeObserver(() => this.resize()).observe(el);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.kick(); });
-    this.clock = new THREE.Clock(); this.frameTimes = []; this.prSlow = 0; this.prFast = 0; this.prChanges = 0;
+    this.clock = new THREE.Clock(); this.lastDraw = 0;
     this.resize();
     this.kick();
   }
@@ -225,33 +233,88 @@ export class Hall {
   }
 
   // ---------------------------------------------------------------- Modelle
-  async template(cad) {
-    if (this.templates.has(cad)) return this.templates.get(cad);
+  // lo: leichte Fernfassung (docs/models/lod, tools/build_lod.py) – gleiche Lage und Materialklassen wie die volle
+  async template(cad, lo = false) {
+    const key = lo ? cad + '@lo' : cad;
+    if (this.templates.has(key)) return this.templates.get(key);
     const p = (async () => {
       const man = this.opt.models[cad];
-      const g = await this.gltf.loadAsync(this.base + man.file);
-      const obj = g.scene;
-      let scr = null;
+      const g = await this.gltf.loadAsync(this.base + (lo ? this.opt.lod[cad].file : man.file));
+      const obj = g.scene, pack = [];
       obj.traverse((o) => {
         if (!o.isMesh) return;
         const cls = (o.material.name || '').replace('zc_', '');
-        if (cls === 'screen') {
-          if (!scr) {
-            const tex = this.texLoader.load(this.base + man.screen, () => this.kick()); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = this.aniso;
-            scr = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });   // einige Bildschirmflächen haben umgekehrte Windung
-            scr.userData.screen = true;
-          }
-          o.material = scr; o.castShadow = false;
-        } else {
-          o.material = this.lib[cls] || this.lib.darkgrey; o.castShadow = true;
-        }
+        if (cls === 'screen') { o.material = this.screenMat(man.screen); o.castShadow = false; }
+        else if (CLS[cls] && CLS[cls].emissive) { o.material = this.lib[cls]; o.castShadow = true; }
+        else pack.push([o, CLS[cls] ? cls : 'darkgrey']);
         o.receiveShadow = true;
       });
+      this.packClasses(obj, pack);
       obj.userData.size = man.size;
       return obj;
-    })().catch((e) => { console.warn('Modell', cad, e); return null; });
-    this.templates.set(cad, p);
+    })().catch((e) => { console.warn('Modell', key, e); return null; });
+    this.templates.set(key, p);
     return p;
+  }
+  // je Bildschirmbild ein Material (volle und leichte Fassung, alle »zidCode«-Stationen teilen es; der Scan tauscht es
+  // an einer Station gegen eine eigene Kopie)
+  screenMat(file) {
+    const m = this.scrMats || (this.scrMats = new Map());
+    if (!m.has(file)) {
+      const tex = this.texLoader.load(this.base + file, () => this.kick()); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = this.aniso;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });   // einige Bildschirmflächen haben umgekehrte Windung
+      mat.userData.screen = true; m.set(file, mat);
+    }
+    return m.get(file);
+  }
+  // Ein Mesh je Materialfamilie statt eines je Klasse (bis zu 23 Draw-Calls je Gerät → 2): Farbe, Rauheit, Metall und
+  // Klarlack der Klasse (CLS) stehen als Vertex-Attribute am Mesh, der Shader liest sie statt der Materialwerte
+  packClasses(obj, pack) {
+    if (!pack.length) return;
+    obj.updateMatrixWorld(true);
+    const fam = { std: [], cc: [] };
+    for (const [o, cls] of pack) {
+      const src = o.geometry, gm = new THREE.BufferGeometry(), n = src.attributes.position.count;
+      gm.setAttribute('position', src.attributes.position.clone()); gm.setAttribute('normal', src.attributes.normal.clone());
+      gm.setIndex(src.index ? src.index.clone() : [...Array(n).keys()]);
+      gm.applyMatrix4(o.matrixWorld);
+      packAttrs(gm, CLS[cls]);
+      fam[CLS[cls].clearcoat ? 'cc' : 'std'].push(gm);
+      o.removeFromParent(); src.dispose();
+    }
+    for (const [k, list] of Object.entries(fam)) {
+      if (!list.length) continue;
+      const m = new THREE.Mesh(mergeGeometries(list), packMat(k, THREE.DoubleSide)); m.castShadow = true; m.receiveShadow = true; obj.add(m);
+      for (const x of list) x.dispose();
+    }
+  }
+
+  // Detailstufe je Gerät: Fernfassung, bis es groß im Bild ist (Pixelhöhe der Hüllkugel); die volle Fassung wird erst
+  // dann geladen (am Desktop vorab im Leerlauf). force: alle voll (Bild, GLB, PDF).
+  updateLod(force = false) {
+    const cam = this.camera, k = (this.el.clientHeight || 1) / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2));
+    const v = this._lodV || (this._lodV = new THREE.Vector3());
+    for (const o of this.devices.values()) {
+      const L = o.lod; if (!L) continue;
+      const px = 2 * L.r * k / Math.max(.2, cam.position.distanceTo(v.set(o.position.x, L.cy, o.position.z)));
+      const want = force || px > (L.on ? 190 : 240);
+      if (want && !L.hi) { this.loadHi(o); continue; }
+      if (L.hi && L.on !== want) { L.on = want; L.hi.visible = want; L.lo.visible = !want; }
+    }
+  }
+  loadHi(o) {
+    const L = o.lod;
+    if (!L.loading) {
+      L.loading = this.template(L.cad).then((t) => {
+        if (!t || L.hi) return;
+        const hi = t.clone(); hi.visible = false; L.lo.parent.add(hi); L.hi = hi; this.kick();
+      });
+    }
+    return L.loading;
+  }
+  async allHi() {
+    await Promise.all([...this.devices.values()].filter(o => o.lod).map(o => this.loadHi(o)));
+    this.updateLod(true);
   }
 
   photo(pid) {
@@ -281,10 +344,12 @@ export class Hall {
   // plan = { devices: [{key, pid}], machines: [{key, type, brandId, brand, model, accent, controlName, label, group, zid, custom}], software: [pid], lang }
   async setPlan(plan) {
     this.plan = plan;
+    // zuerst nur die Fernfassungen laden (die vollen folgen bei Bedarf), »zidCode« an den Maschinen in beiden Stufen
+    const lod = this.opt.lod || {};
     const need = new Set();
-    for (const d of plan.devices) { const pr = PRODUCTS[d.pid]; if (pr.cad) need.add(pr.cad); }
-    if (plan.machines.some(m => m.zid)) { need.add('zidcode_lo'); need.add('zidcode'); }
-    const wait = [...need].map(c => this.template(c).catch(() => null));
+    for (const d of plan.devices) { const pr = PRODUCTS[d.pid]; if (pr.cad) need.add(lod[pr.cad] ? pr.cad + '@lo' : pr.cad); }
+    if (plan.machines.some(m => m.zid)) { need.add(lod.zidcode ? 'zidcode@lo' : 'zidcode_lo'); need.add('zidcode'); }
+    const wait = [...need].map(c => this.template(c.replace('@lo', ''), c.endsWith('@lo')).catch(() => null));
     if (this.opt.onProgress) {
       let done = 0; wait.forEach(p => p.then(() => this.opt.onProgress(++done / wait.length)));
       if (!wait.length) this.opt.onProgress(1);
@@ -299,12 +364,17 @@ export class Hall {
       if (this.devices.has(d.key)) continue;
       const pr = PRODUCTS[d.pid];
       let obj;
-      if (pr.cad) { const t = await this.template(pr.cad); obj = t ? t.clone() : this.photo(d.pid); if (t) obj.userData.size = t.userData.size; }
+      const lo = pr.cad && lod[pr.cad] ? await this.template(pr.cad, true) : null;
+      let L = null;
+      if (lo) { obj = new THREE.Group(); const l = lo.clone(); obj.add(l); obj.userData.size = lo.userData.size; L = { cad: pr.cad, lo: l, hi: null, on: false }; }
+      else if (pr.cad) { const t = await this.template(pr.cad); obj = t ? t.clone() : this.photo(d.pid); if (t) obj.userData.size = t.userData.size; }
       else obj = this.photo(d.pid);
       const holder = new THREE.Group(); holder.add(obj);
       const sz = obj.userData.size || [1, 1.5, 1];
       holder.add(this.blob(sz[0], sz[2]));
       holder.userData = { pick: { kind: 'device', pid: d.pid, key: d.key }, size: sz, pid: d.pid, step: pr.step, photo: !!obj.userData.photo, cad: obj.userData.photo ? null : pr.cad };
+      // Detailstufen als Eigenschaft, nicht in userData (clone() kopiert userData per JSON – mit Modellen darin viel zu groß)
+      if (L) { L.r = .5 * Math.hypot(sz[0], sz[1], sz[2]); L.cy = sz[1] / 2; holder.lod = L; }
       holder.board = obj.board || null;
       holder.scale.setScalar(.001);
       this.devG.add(holder);
@@ -315,7 +385,7 @@ export class Hall {
     // --- Maschinen
     const mseen = new Set();
     const zFull = this.opt.models.zidcode ? await this.template('zidcode') : null;
-    const zLo = this.opt.models.zidcode_lo ? await this.template('zidcode_lo') : zFull;
+    const zLo = lod.zidcode ? await this.template('zidcode', true) : this.opt.models.zidcode_lo ? await this.template('zidcode_lo') : zFull;
     for (const m of plan.machines) {
       mseen.add(m.key);
       const sig = [m.type, m.brandId, m.model, m.accent, m.controlName, m.label, m.zid, m.custom ? m.custom.uuid : ''].join('|');
@@ -359,6 +429,8 @@ export class Hall {
     this.renderer.shadowMap.needsUpdate = true;
     this.arCache = null;
     this.kick();
+    // Desktop: volle Modelle im Leerlauf vorladen (kein Aufpoppen beim Heranzoomen); Handy/Tablet: erst bei Bedarf
+    if (!this.touch) { clearTimeout(this.prefetchT); this.prefetchT = setTimeout(() => { for (const o of this.devices.values()) if (o.lod) this.loadHi(o); }, 2500); }
     if (this.opt.onPlan) this.opt.onPlan();
     return this.bounds;
   }
@@ -774,6 +846,8 @@ export class Hall {
     const v = this._lv || (this._lv = new THREE.Vector3());
     const camPos = this.camera.position;
     const shown = [];
+    // Stile nur bei Änderung schreiben (läuft in jedem Bild)
+    const showTag = (l, on) => { if (l.on !== on) { l.on = on; l.el.style.opacity = on ? '' : '0'; l.el.style.pointerEvents = on ? '' : 'none'; } };
     for (const l of this.labels) {
       v.copy(l.pos).project(this.camera);
       const vis = v.z < 1 && v.x > -1.1 && v.x < 1.1 && v.y > -1.1 && v.y < 1.1;
@@ -781,7 +855,7 @@ export class Hall {
       const far = l.kind === 'machine' ? d > 75 : d > 130;
       const show = vis && !far && (l.kind === 'machine' || this.mode === 'after');
       if (show) shown.push({ l, x: (v.x * .5 + .5) * w, y: (-v.y * .5 + .5) * h });
-      else { l.el.style.opacity = '0'; l.el.style.pointerEvents = 'none'; }
+      else showTag(l, false);
     }
     // Überlappungen auflösen: Stationen zuerst (vorne vor hinten) und bei Bedarf nach oben gestapelt,
     // Maschinenschilder, die ein anderes Schild verdecken würden, treten zurück
@@ -798,11 +872,11 @@ export class Hall {
         if (l.kind === 'machine' || k === 5) { ok = false; break; }
         y = hit.y0 - 4;
       }
-      l.el.style.opacity = ok ? '' : '0';
-      l.el.style.pointerEvents = ok ? '' : 'none';
+      showTag(l, ok);
       if (!ok) continue;
       placed.push({ x0, x1, y0: y - l.h, y1: y });
-      l.el.style.transform = `translate(${it.x}px, ${y}px) translate(-50%, -100%)`;
+      const tf = `translate(${it.x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+      if (l.tf !== tf) { l.tf = tf; l.el.style.transform = tf; }
     }
   }
 
@@ -957,7 +1031,9 @@ export class Hall {
     const r = this.canvas.getBoundingClientRect();
     const v = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     this.ray.setFromCamera(v, this.camera);
-    const hits = this.ray.intersectObjects([...this.devG.children, ...this.macG.children], true);
+    // Geräte mit Detailstufen gegen die Fernfassung prüfen: für die Auswahl genau genug, bis zu 10× weniger Dreiecke
+    const devs = this.devG.children.map(o => o.lod ? o.lod.lo : o);     // Treffer führen über parent zum Gerät
+    const hits = this.ray.intersectObjects([...devs, ...this.macG.children], true);
     for (const h of hits) {
       if (h.object.userData.blob || h.object.userData.zidRing) continue;
       let o = h.object;
@@ -985,6 +1061,31 @@ export class Hall {
     if (this.shift && w) this.camera.setViewOffset(w, h, -this.shift * w, 0, w, h); else this.camera.clearViewOffset();
   }
   kick() { if (!this.raf && !this.xrActive) this.raf = requestAnimationFrame(this.loop); }
+  // verdeckt (Seite »Gewinn« liegt darüber, ausgeblendet) → nicht zeichnen; setVisible(true)/resize() stoßen wieder an
+  setVisible(on) { this.visible = on; if (on) this.kick(); }
+  shown() {
+    const e = this.el; if (this.visible === false || !e.clientWidth || !e.clientHeight) return false;
+    return e.checkVisibility ? e.checkVisibility({ visibilityProperty: true }) : true;
+  }
+  // Pixelverhältnis: Kamerafahrt/Drehen mit dem Budget motionPx, Werkzeugfluss ohne Bewegung mit ambientPx (beide passen
+  // sich der gemessenen Bildrate an), stehendes Bild voll scharf
+  adapt(now, kind) {
+    const area = Math.max(1, this.el.clientWidth * this.el.clientHeight), full = area * this.maxPR * this.maxPR;
+    let pr = this.maxPR;
+    if (kind) {
+      if (this.frameT && this.frameKind === kind) {
+        const ft = now - this.frameT, slow = kind === 'motion' ? 26 : 1000 / AMBIENT_FPS + 12, fast = kind === 'motion' ? 18 : 1000 / AMBIENT_FPS + 4;
+        this.ftAvg = this.ftAvg ? this.ftAvg * .88 + ft * .12 : ft;
+        this.ftN = (this.ftN || 0) + 1;
+        const key = kind + 'Px';
+        if (this.ftN > 12 && this.ftAvg > slow && Math.min(this[key], full) > 1.6e5) { this[key] = Math.min(this[key], full) * .72; this.ftN = 0; }
+        else if (this.ftN > 90 && this.ftAvg < fast && this[key] < full) { this[key] *= 1.2; this.ftN = 0; }
+      } else { this.ftAvg = 0; this.ftN = 0; }
+      this.frameT = now; this.frameKind = kind;
+      pr = THREE.MathUtils.clamp(Math.sqrt(this[kind + 'Px'] / area), Math.min(.7, this.maxPR), this.maxPR);
+    } else this.frameT = 0;
+    if (Math.abs(pr - this.pr) > .05) { this.pr = pr; this.renderer.setPixelRatio(pr); }
+  }
   // Nah- und Fernebene folgen dem Abstand zum Ziel: gleichbleibend hohe Tiefenauflösung, kein Flackern aus der Ferne
   clip() {
     const d = this.camera.position.distanceTo(this.controls.target);
@@ -996,9 +1097,13 @@ export class Hall {
   loop() {
     this.raf = 0;
     const now = performance.now();
-    const dt = Math.min(.05, this.clock.getDelta());
-    const t = this.clock.elapsedTime;
-    let busy = false;
+    if (!this.shown()) { this.frameT = 0; return; }
+    // nur Umgebungsbewegung (Werkzeugfluss, Signalsäulen): höchstens AMBIENT_FPS Bilder/s
+    const moving = this.camAnim || this.anims.length || this.controls.autoRotate || this.moved;
+    if (!moving && now - this.lastDraw < 1000 / AMBIENT_FPS - 3) { this.raf = requestAnimationFrame(this.loop); return; }
+    this.lastDraw = now;
+    const t = this.clock.getElapsedTime();
+    let busy = false, ambient = false;
     if (this.camAnim) {
       const a = this.camAnim; const k = Math.min(1, (now - a.start) / a.dur); const e = easeIO(k);
       this.camera.position.lerpVectors(a.p0, a.p1, e); this.controls.target.lerpVectors(a.t0, a.t1, e);
@@ -1013,6 +1118,7 @@ export class Hall {
     }
     if (this.controls.autoRotate && (this.camAnim || matchMedia('(prefers-reduced-motion: reduce)').matches)) this.controls.autoRotate = false;
     const changed = this.controls.update();
+    this.moved = changed;
     if (this.controls.autoRotate) busy = true;
     this.clip();
     const cam = this.camera.position;
@@ -1063,26 +1169,20 @@ export class Hall {
         }
         this.packets.instanceMatrix.needsUpdate = true;
       }
-      busy = true;
+      ambient = true;
     }
-    if (this.mode === 'before' && this.machines.size) busy = true;     // blinkende Signalsäulen
+    if (this.mode === 'before' && this.machines.size) ambient = true;     // blinkende Signalsäulen
+    this.adapt(now, busy || changed ? 'motion' : ambient ? 'ambient' : null);
+    this.updateLod();
     this.renderer.render(this.scene, this.camera);
     this.updateLabels();
-    // adaptive Auflösung mit Hysterese (kein Hin- und Herspringen, das wie Flackern wirkt)
-    this.frameTimes.push(dt);
-    if (this.frameTimes.length >= 60) {
-      const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length; this.frameTimes = [];
-      this.prSlow = avg > .030 ? this.prSlow + 1 : 0;
-      this.prFast = avg < .012 ? this.prFast + 1 : 0;
-      if (this.prSlow >= 2 && this.pr > 1) { this.pr = Math.max(1, this.pr - .25); this.prSlow = 0; this.prChanges++; this.renderer.setPixelRatio(this.pr); this.resize(); }
-      else if (this.prFast >= 5 && this.pr < this.maxPR && this.prChanges < 4) { this.pr = Math.min(this.maxPR, this.pr + .25); this.prFast = 0; this.prChanges++; this.renderer.setPixelRatio(this.pr); this.resize(); }
-    }
-    if (busy || changed) this.kick();
+    if (busy || changed || ambient) this.kick();
   }
 
   // ---------------------------------------------------------------- Export: Bild + GLB
-  snapshot(w = 1600, h = 900, view = 'hall') {
-    // eigenes Bild im Format w×h: Bereich sofort einpassen, danach Kamera und Größe zurück
+  async snapshot(w = 1600, h = 900, view = 'hall') {
+    // eigenes Bild im Format w×h: Bereich sofort einpassen, danach Kamera und Größe zurück; immer mit den vollen Modellen
+    await this.allHi();
     const pr = this.renderer.getPixelRatio();
     const cam = this.camera, keep = { pos: cam.position.clone(), tgt: this.controls.target.clone(), fov: cam.fov, near: cam.near, far: cam.far };
     const labels = this.labelsOn;
@@ -1096,6 +1196,8 @@ export class Hall {
       if (a) { cam.position.copy(a.p1); cam.lookAt(a.t1); this.controls.target.copy(a.t1); }
     }
     this.clip();
+    this.updateLod(true);
+    this.renderer.shadowMap.needsUpdate = true;
     this.renderer.render(this.scene, cam);
     const url = this.canvas.toDataURL('image/jpeg', .9);
     cam.position.copy(keep.pos); cam.fov = keep.fov; this.controls.target.copy(keep.tgt); cam.lookAt(keep.tgt);
@@ -1110,14 +1212,30 @@ export class Hall {
     for (const o of parts) {
       if (!o) continue;
       if (o.scale.x < .5) continue;
+      // ohne userData klonen: clone() kopiert sie per JSON, und der Exporter schreibt sie als »extras« in die Datei –
+      // Maschinen tragen dort ihr ganzes Modell (body), das machte die GLB-Datei zu 90 % Text
+      const stash = new Map();
+      o.traverse((x) => { stash.set(x, x.userData); x.userData = x.userData.blob ? { blob: true } : {}; });
       const c = o.clone(true);
-      c.traverse(x => { if (x.isMesh && x.userData.blob) x.visible = false; });
+      for (const [x, u] of stash) x.userData = u;
+      const packed = [], hidden = [];
+      c.traverse(x => {
+        if (x.isMesh && x.userData.blob) x.visible = false;
+        if (!x.isMesh || !x.material.userData.pack) return;
+        let vis = true; for (let o = x; o && o !== c.parent; o = o.parent) if (!o.visible) vis = false;
+        (vis ? packed : hidden).push(x);
+      });
+      // gebündelte Meshes je Farbe/Oberfläche aufteilen (GLB kennt keine Oberflächenwerte je Vertex); ausgeblendete
+      // Detailstufen fallen weg
+      for (const x of hidden) x.removeFromParent();
+      for (const x of packed) { for (const u of unpackMesh(x)) { u.position.copy(x.position); u.quaternion.copy(x.quaternion); u.scale.copy(x.scale); x.parent.add(u); } x.removeFromParent(); }
       g.add(c);
     }
     return g;
   }
   async exportGLB() {
     const { GLTFExporter } = await import('../vendor/GLTFExporter.js');
+    await this.allHi();     // exportiert wird nur Sichtbares → volle Modelle einblenden (die Schleife stellt danach zurück)
     const root = this.exportRoot();
     return new Promise((res, rej) => new GLTFExporter().parse(root, (buf) => res(new Blob([buf], { type: 'model/gltf-binary' })), rej, { binary: true, onlyVisible: true }));
   }
@@ -1163,8 +1281,8 @@ export class Hall {
         const c = new THREE.Group();
         m.userData.body.traverse((x) => {
           if (!x.isMesh) return;
-          const mesh = new THREE.Mesh(x.geometry, this.arMaterial(x.material));
-          mesh.applyMatrix4(x.matrixWorld); c.add(mesh);
+          const meshes = x.material.userData.pack ? unpackMesh(x) : [new THREE.Mesh(x.geometry, this.arMaterial(x.material))];
+          for (const mesh of meshes) { mesh.applyMatrix4(x.matrixWorld); c.add(mesh); }
         });
         c.applyMatrix4(toLocal);
         rest.add(c);

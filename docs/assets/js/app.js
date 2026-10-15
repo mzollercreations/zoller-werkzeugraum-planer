@@ -119,12 +119,13 @@ async function init() {
   $('[data-names]')?.addEventListener('click', () => setNames(S.hall ? !S.hall.labelsOn : false));
   // 3D-Halle (lazy, damit die Seite sofort steht)
   const models = await fetch(BASE + 'data/models.json').then((r) => r.json()).catch(() => ({}));
+  const lod = await fetch(BASE + 'data/lod.json').then((r) => r.json()).catch(() => ({}));
   const aspects = await fetch(BASE + 'data/aspects.json').then((r) => r.json()).catch(() => ({}));
   try {
     const { Hall } = await import('./scene.js');
     const logo = await logoTexture();
     S.hall = new Hall($('[data-stage]'), {
-      base: BASE, models, aspects, t, logo,
+      base: BASE, models, lod, aspects, t, logo,
       onPick: onPick, onProgress: (k) => { $('[data-progress]').style.width = (k * 100) + '%'; if (k >= 1) setTimeout(() => $('[data-loader]').classList.add('is-done'), 300); },
       onTourEnd: () => tourLabel(false),
       onPlan: () => { if (S.step === 'room') prepareAR(); },
@@ -444,6 +445,7 @@ function render() {
   renderTicker();
   const gainEl = $('[data-gain]');
   if (S.step === 'gain') { gainEl.hidden = false; renderGain(); } else gainEl.hidden = true;
+  S.hall?.setVisible(S.step !== 'gain');      // die Gewinn-Seite liegt über der Halle: dort nicht zeichnen
   $('[data-hud]').hidden = S.step === 'intro';
 }
 function renderSteps() {
@@ -791,7 +793,7 @@ function bindPanel() {
     else if (act === 'addm') editMachine(null);
     else if (act === 'editprod') editProduction();
     else if (act === 'tour') toggleTour();
-    else if (act === 'png') { const url = S.hall.snapshot(2400, 1350); download(url, 'ZOLLER-Werkzeugraum.jpg'); }
+    else if (act === 'png') { const url = await S.hall.snapshot(2400, 1350); download(url, 'ZOLLER-Werkzeugraum.jpg'); }
     else if (act === 'glb') { toast(t('room.exporting')); const b = await S.hall.exportGLB(); download(URL.createObjectURL(b), 'ZOLLER-Werkzeugraum.glb'); }
     else if (act === 'qr') openQR();
     else if (act === 'xr') startXR();
@@ -1013,8 +1015,8 @@ function svgCapacity(n, eq) {
 async function report() {
   try { await Promise.all(['400 11px "T-Star"', '700 12px "T-Star"'].map((f) => document.fonts.load(f))); } catch {}
   const p = S.profile, g = S.gain, st = g.stats;
-  const shot = S.hall ? S.hall.snapshot(2000, 1000, 'hall') : '';
-  const shotTool = S.hall ? S.hall.snapshot(2000, 1000, 'tool') : '';
+  const shot = S.hall ? await S.hall.snapshot(2000, 1000, 'hall') : '';
+  const shotTool = S.hall ? await S.hall.snapshot(2000, 1000, 'tool') : '';
   const date = new Date().toLocaleDateString(LOC);
   const dayMin = p.hours * 60, ch = p.changes;
   const measB = (p.measure === 'zoller' ? 1.52 : 4.52) * ch, entB = (p.data === 'post' ? 0 : .75) * ch;

@@ -1,0 +1,38 @@
+{
+ "keeper": {
+  "file": "models/lod/keeper.glb",
+  "tris": 16039
+ },
+ "smile": {
+  "file": "models/lod/smile.glb",
+  "tris": 10074
+ },
+ "toolcart": {
+  "file": "models/lod/toolcart.glb",
+  "tris": 17715
+ },
+ "toolorganizer": {
+  "file": "models/lod/toolorganizer.glb",
+  "tris": 14924
+ },
+ "toolstation": {
+  "file": "models/lod/toolstation.glb",
+  "tris": 27299
+ },
+ "venturion": {
+  "file": "models/lod/venturion.glb",
+  "tris": 8459
+ },
+ "venturion600": {
+  "file": "models/lod/venturion600.glb",
+  "tris": 8466
+ },
+ "venturion800": {
+  "file": "models/lod/venturion800.glb",
+  "tris": 8957
+ },
+ "zidcode": {
+  "file": "models/lod/zidcode.glb",
+  "tris": 8752
+ }
+}

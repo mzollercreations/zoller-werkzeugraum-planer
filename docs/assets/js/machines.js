@@ -33,6 +33,69 @@ const STYLES = {
 };
 const DEFAULT_STYLE = { body: '#e4e7e9', door: '#e4e7e9', lower: '#33383d', trim: null, text: null, panel: 'arm' };
 
+// Materialklassen als Vertex-Attribute: Farbe (color) + Rauheit, Metall, Klarlack, Klarlack-Rauheit (rmc)
+export function packAttrs(gm, v) {
+  const n = gm.attributes.position.count, col = new Float32Array(n * 3), rmc = new Float32Array(n * 4);
+  const c = new THREE.Color(v.color), r4 = [v.roughness ?? .5, v.metalness || 0, v.clearcoat || 0, v.clearcoatRoughness || 0];
+  for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; rmc[i * 4] = r4[0]; rmc[i * 4 + 1] = r4[1]; rmc[i * 4 + 2] = r4[2]; rmc[i * 4 + 3] = r4[3]; }
+  gm.setAttribute('color', new THREE.BufferAttribute(col, 3)); gm.setAttribute('rmc', new THREE.BufferAttribute(rmc, 4));
+  return gm;
+}
+const PACK = new Map();
+// Material, das Farbe/Rauheit/Metall/Klarlack aus den Vertex-Attributen liest ('cc': mit Klarlack-Schicht)
+export function packMat(k, side = THREE.FrontSide) {
+  const key = k + side;
+  if (PACK.has(key)) return PACK.get(key);
+  const m = k === 'cc' ? new THREE.MeshPhysicalMaterial({ vertexColors: true, clearcoat: 1, side }) : new THREE.MeshStandardMaterial({ vertexColors: true, side });
+  m.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 rmc;\nvarying vec4 vRmc;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRmc = rmc;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec4 vRmc;')
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vRmc.x;')
+      .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vRmc.y;')
+      .replace('#include <lights_physical_fragment>', THREE.ShaderChunk.lights_physical_fragment
+        .replace('material.clearcoat = clearcoat;', 'material.clearcoat = vRmc.z;')
+        .replace('material.clearcoatRoughness = clearcoatRoughness;', 'material.clearcoatRoughness = vRmc.w;'));
+  };
+  m.customProgramCacheKey = () => 'zc-pack-' + k;
+  m.userData.pack = k;
+  PACK.set(key, m);
+  return m;
+}
+// gebündeltes Mesh (packMat) für den Export wieder je Farbe/Oberfläche aufteilen – GLB und USDZ kennen keine
+// Oberflächenwerte je Vertex. Je Geometrie nur einmal: Kopien (gleiches Gerät mehrfach) teilen Geometrie und Material,
+// indizierte Teile teilen sich sogar Punkte und Normalen (nur der Index wird aufgeteilt). Liefert Meshes ohne eigene Lage.
+const UNPACK = new WeakMap();
+export function unpackMesh(mesh) {
+  const g = mesh.geometry;
+  if (!UNPACK.has(g)) {
+    const idx = g.index ? g.index.array : null, col = g.attributes.color.array, rmc = g.attributes.rmc.array;
+    const n = (idx ? idx.length : g.attributes.position.count) / 3, groups = new Map();
+    for (let t = 0; t < n; t++) {
+      const v = idx ? idx[t * 3] : t * 3;
+      const k = [col[v * 3], col[v * 3 + 1], col[v * 3 + 2], rmc[v * 4], rmc[v * 4 + 1], rmc[v * 4 + 2], rmc[v * 4 + 3]].map(x => x.toFixed(4)).join();
+      let a = groups.get(k); if (!a) groups.set(k, a = []); a.push(t);
+    }
+    const parts = [];
+    for (const [k, ts] of groups) {
+      const [r, gg, b, ro, me, cc, ccr] = k.split(',').map(Number);
+      const geo = new THREE.BufferGeometry();
+      if (idx) {
+        geo.setAttribute('position', g.attributes.position); geo.setAttribute('normal', g.attributes.normal);
+        const I = new Uint32Array(ts.length * 3); ts.forEach((t, i) => I.set(idx.subarray(t * 3, t * 3 + 3), i * 3)); geo.setIndex(new THREE.BufferAttribute(I, 1));
+      } else {
+        const pos = g.attributes.position.array, nrm = g.attributes.normal.array, P = new Float32Array(ts.length * 9), N = new Float32Array(ts.length * 9);
+        ts.forEach((t, i) => { P.set(pos.subarray(t * 9, t * 9 + 9), i * 9); N.set(nrm.subarray(t * 9, t * 9 + 9), i * 9); });
+        geo.setAttribute('position', new THREE.BufferAttribute(P, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+      }
+      const o = { color: new THREE.Color(r, gg, b), roughness: ro, metalness: me, side: mesh.material.side };
+      parts.push([geo, cc ? new THREE.MeshPhysicalMaterial({ ...o, clearcoat: cc, clearcoatRoughness: ccr }) : new THREE.MeshStandardMaterial(o)]);
+    }
+    UNPACK.set(g, parts);
+  }
+  return UNPACK.get(g).map(([geo, mat]) => new THREE.Mesh(geo, mat));
+}
+
 // ------------------------------------------------------------------ Materialien (je Farbe einmal)
 const M = {};
 const cache = new Map();
@@ -483,18 +546,24 @@ export function buildMachine(type, opt = {}) {
 }
 
 // alle festen Teile einer Maschine je Material zu einem Mesh zusammenfassen (wenige Draw-Calls bei vielen Maschinen)
+// Untexturierte, undurchsichtige Lacke und Metalle kommen in zwei Meshes (mit/ohne Klarlack), Farbe und Oberfläche als
+// Vertex-Attribute (packMat) – aus ~15 Draw-Calls je Maschine werden so etwa 6.
 function mergeByMaterial(g) {
   g.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
   const groups = new Map(), drop = [];
   g.traverse((o) => {
     if (!o.isMesh || o.userData.keep) return;
+    const mat = o.material;
     const geo = o.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
     const ng = geo.index ? geo.toNonIndexed() : geo;
-    for (const k of Object.keys(ng.attributes)) if (!['position', 'normal', 'uv'].includes(k)) ng.deleteAttribute(k);
-    if (!ng.attributes.uv) ng.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(ng.attributes.position.count * 2), 2));
-    if (!groups.has(o.material)) groups.set(o.material, []);
-    groups.get(o.material).push(ng);
+    const pk = mat.isMeshStandardMaterial && !mat.map && !mat.transparent && !mat.emissive.getHex() ? (mat.clearcoat ? 'cc' : 'std') : null;
+    for (const k of Object.keys(ng.attributes)) if (!['position', 'normal', 'uv'].includes(k) || (pk && k === 'uv')) ng.deleteAttribute(k);
+    if (pk) packAttrs(ng, mat);
+    else if (!ng.attributes.uv) ng.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(ng.attributes.position.count * 2), 2));
+    const key = pk ? packMat(pk) : mat;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(ng);
     drop.push(o);
   });
   const keep = [];
