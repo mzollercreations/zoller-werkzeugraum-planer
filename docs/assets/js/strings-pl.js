@@ -161,7 +161,7 @@ export default {
   'a.more': 'Jeszcze kilka krótkich pytań ({n}), a planowanie będzie dokładne.', 'a.skip': 'Pomiń pytania',
   'a.done': 'Gotowe. Twoja narzędziownia stoi: {items} rozwiązań ZOLLER, +{hours} godzin wrzeciona i {eur} wartości dodanej rocznie.',
   'a.cta.solution': 'Zobacz rozwiązanie', 'a.cta.gain': 'Zobacz zysk', 'a.you': 'Ty', 'a.bot': 'Planer',
-  'composer.ph': 'Uzupełnij lub zmień – np. „dodaj 2 Okuma”, „3 zmiany” albo „bez toolBalancer”', 'composer.send': 'Wyślij',
+  'composer.ph': 'Uzupełnij lub zmień – np. „dodaj 2 Okuma”, „3 zmiany” albo „bez toolBalancer”', 'composer.send': 'Wyślij', 'composer.end': 'Przejdź na koniec czatu',
   'prof.h': 'Twoja produkcja', 'prof.machines': 'Park maszynowy', 'prof.production': 'Produkcja', 'prof.today': 'Dziś', 'prof.add': 'Dodaj maszynę', 'prof.empty': 'Jeszcze brak maszyn.',
   'prof.total': 'maszyny: {n}', 'prof.assumed': 'założenie', 'prof.dmi': 'z.DMI',
   'f.count': 'Liczba', 'f.type': 'Typ', 'f.brand': 'Producent', 'f.model': 'Seria', 'f.control': 'Sterowanie', 'f.holder': 'Chwyt', 'f.value': 'Wartość maszyny (€)',

@@ -161,7 +161,7 @@ export default {
   'a.more': 'Ancora {n} {n|breve domanda|brevi domande} e la pianificazione sarà precisa.', 'a.skip': 'Salta le domande',
   'a.done': 'Fatto. La sua sala utensili è pronta: {items} soluzioni ZOLLER, +{hours} ore mandrino e {eur} di valore aggiunto all’anno.',
   'a.cta.solution': 'Vedere la soluzione', 'a.cta.gain': 'Vedere il guadagno', 'a.you': 'Lei', 'a.bot': 'Pianificatore',
-  'composer.ph': 'Aggiungere o modificare, ad es. «aggiungi 2 Okuma», «3 turni» o «senza toolBalancer»', 'composer.send': 'Invia',
+  'composer.ph': 'Aggiungere o modificare, ad es. «aggiungi 2 Okuma», «3 turni» o «senza toolBalancer»', 'composer.send': 'Invia', 'composer.end': 'Vai alla fine della chat',
   'prof.h': 'La sua produzione', 'prof.machines': 'Parco macchine', 'prof.production': 'Produzione', 'prof.today': 'Oggi', 'prof.add': 'Aggiungi macchina', 'prof.empty': 'Ancora nessuna macchina.',
   'prof.total': '{n} {n|macchina|macchine}', 'prof.assumed': 'ipotesi', 'prof.dmi': 'z.DMI',
   'f.count': 'Quantità', 'f.type': 'Tipo', 'f.brand': 'Costruttore', 'f.model': 'Serie', 'f.control': 'Controllo', 'f.holder': 'Attacco', 'f.value': 'Valore della macchina (€)',

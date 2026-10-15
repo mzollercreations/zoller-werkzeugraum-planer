@@ -161,7 +161,7 @@ export default {
   'a.more': '再回答 {n} 个简短问题，规划就会更精准。', 'a.skip': '跳过问题',
   'a.done': '完成。您的刀具室已规划好：{items} 项 ZOLLER 方案，每年 +{hours} 主轴小时、新增价值 {eur}。',
   'a.cta.solution': '查看方案', 'a.cta.gain': '查看收益', 'a.you': '您', 'a.bot': '规划器',
-  'composer.ph': '补充或修改——例如“再加 2 台 Okuma”“三班制”或“不要 toolBalancer”', 'composer.send': '发送',
+  'composer.ph': '补充或修改——例如“再加 2 台 Okuma”“三班制”或“不要 toolBalancer”', 'composer.send': '发送', 'composer.end': '跳到对话末尾',
   'prof.h': '您的生产', 'prof.machines': '机床', 'prof.production': '生产', 'prof.today': '现状', 'prof.add': '添加机床', 'prof.empty': '还没有机床。',
   'prof.total': '{n} 台机床', 'prof.assumed': '假设', 'prof.dmi': 'z.DMI',
   'f.count': '数量', 'f.type': '类型', 'f.brand': '制造商', 'f.model': '系列', 'f.control': '数控系统', 'f.holder': '刀柄接口', 'f.value': '机床价值（€）',

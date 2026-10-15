@@ -161,7 +161,7 @@ export default {
   'a.more': 'Még néhány rövid kérdés ({n}), és pontos lesz a terv.', 'a.skip': 'Kérdések kihagyása',
   'a.done': 'Kész. A szerszámszobája áll: {items} ZOLLER-megoldás, +{hours} orsóóra és {eur} többletérték évente.',
   'a.cta.solution': 'Megoldás megtekintése', 'a.cta.gain': 'Nyereség megtekintése', 'a.you': 'Ön', 'a.bot': 'Tervező',
-  'composer.ph': 'Kiegészítés vagy módosítás – pl. „még 2 Okuma”, „3 műszak” vagy „toolBalancer nélkül”', 'composer.send': 'Küldés',
+  'composer.ph': 'Kiegészítés vagy módosítás – pl. „még 2 Okuma”, „3 műszak” vagy „toolBalancer nélkül”', 'composer.send': 'Küldés', 'composer.end': 'A csevegés végére',
   'prof.h': 'Az Ön gyártása', 'prof.machines': 'Gépállomány', 'prof.production': 'Gyártás', 'prof.today': 'Ma', 'prof.add': 'Gép hozzáadása', 'prof.empty': 'Még nincsenek gépek.',
   'prof.total': '{n} gép', 'prof.assumed': 'feltételezés', 'prof.dmi': 'z.DMI',
   'f.count': 'Darabszám', 'f.type': 'Típus', 'f.brand': 'Gyártó', 'f.model': 'Sorozat', 'f.control': 'Vezérlés', 'f.holder': 'Befogás', 'f.value': 'Gépérték (€)',

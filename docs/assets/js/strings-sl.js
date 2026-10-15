@@ -161,7 +161,7 @@ export default {
   'a.more': 'Še nekaj kratkih vprašanj ({n}) in načrt bo natančen.', 'a.skip': 'Preskoči vprašanja',
   'a.done': 'Končano. Vaša orodjarna stoji: rešitve ZOLLER {items}, +{hours} ur vretena in {eur} dodane vrednosti na leto.',
   'a.cta.solution': 'Prikaži rešitev', 'a.cta.gain': 'Prikaži prihranek', 'a.you': 'Vi', 'a.bot': 'Načrtovalnik',
-  'composer.ph': 'Dopolnite ali spremenite – npr. »dodaj 2 Okuma«, »3 izmene« ali »brez toolBalancer«', 'composer.send': 'Pošlji',
+  'composer.ph': 'Dopolnite ali spremenite – npr. »dodaj 2 Okuma«, »3 izmene« ali »brez toolBalancer«', 'composer.send': 'Pošlji', 'composer.end': 'Na konec klepeta',
   'prof.h': 'Vaša proizvodnja', 'prof.machines': 'Strojni park', 'prof.production': 'Proizvodnja', 'prof.today': 'Danes', 'prof.add': 'Dodaj stroj', 'prof.empty': 'Še ni strojev.',
   'prof.total': 'stroji: {n}', 'prof.assumed': 'predpostavka', 'prof.dmi': 'z.DMI',
   'f.count': 'Število', 'f.type': 'Vrsta', 'f.brand': 'Proizvajalec', 'f.model': 'Serija', 'f.control': 'Krmilje', 'f.holder': 'Vpetje', 'f.value': 'Vrednost stroja (€)',

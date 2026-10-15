@@ -161,7 +161,7 @@ export default {
   'a.more': 'Ještě pár krátkých otázek ({n}) a plán bude přesný.', 'a.skip': 'Přeskočit otázky',
   'a.done': 'Hotovo. Vaše nástrojárna stojí: řešení ZOLLER {items}, +{hours} hodin vřetene a {eur} přidané hodnoty ročně.',
   'a.cta.solution': 'Zobrazit řešení', 'a.cta.gain': 'Zobrazit zisk', 'a.you': 'Vy', 'a.bot': 'Plánovač',
-  'composer.ph': 'Doplnit nebo změnit – např. „přidat 2 Okuma“, „3 směny“ nebo „bez toolBalancer“', 'composer.send': 'Odeslat',
+  'composer.ph': 'Doplnit nebo změnit – např. „přidat 2 Okuma“, „3 směny“ nebo „bez toolBalancer“', 'composer.send': 'Odeslat', 'composer.end': 'Na konec chatu',
   'prof.h': 'Vaše výroba', 'prof.machines': 'Strojový park', 'prof.production': 'Výroba', 'prof.today': 'Dnes', 'prof.add': 'Přidat stroj', 'prof.empty': 'Zatím žádné stroje.',
   'prof.total': 'stroje: {n}', 'prof.assumed': 'předpoklad', 'prof.dmi': 'z.DMI',
   'f.count': 'Počet', 'f.type': 'Typ', 'f.brand': 'Výrobce', 'f.model': 'Řada', 'f.control': 'Řídicí systém', 'f.holder': 'Upínání', 'f.value': 'Hodnota stroje (€)',

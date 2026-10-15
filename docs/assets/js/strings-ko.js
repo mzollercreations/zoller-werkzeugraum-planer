@@ -161,7 +161,7 @@ export default {
   'a.more': '짧은 질문 {n}개만 더 답하시면 계획이 정확해집니다.', 'a.skip': '질문 건너뛰기',
   'a.done': '완료했습니다. 툴룸 계획이 준비되었습니다: ZOLLER 솔루션 {items}건, 연간 스핀들 시간 +{hours}, 부가가치 {eur}.',
   'a.cta.solution': '솔루션 보기', 'a.cta.gain': '효과 보기', 'a.you': '고객님', 'a.bot': '플래너',
-  'composer.ph': '추가·변경 – 예: “Okuma 2대 추가”, “3교대”, “toolBalancer 제외”', 'composer.send': '보내기',
+  'composer.ph': '추가·변경 – 예: “Okuma 2대 추가”, “3교대”, “toolBalancer 제외”', 'composer.send': '보내기', 'composer.end': '채팅 맨 아래로',
   'prof.h': '고객님의 생산', 'prof.machines': '기계', 'prof.production': '생산', 'prof.today': '현재', 'prof.add': '기계 추가', 'prof.empty': '아직 기계가 없습니다.',
   'prof.total': '기계 {n}대', 'prof.assumed': '가정', 'prof.dmi': 'z.DMI',
   'f.count': '수량', 'f.type': '유형', 'f.brand': '제조사', 'f.model': '시리즈', 'f.control': 'NC', 'f.holder': '생크', 'f.value': '기계 가격(€)',

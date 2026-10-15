@@ -161,7 +161,7 @@ export default {
   'a.more': 'Birkaç kısa soru daha ({n}) ve plan kesinleşir.', 'a.skip': 'Soruları atla',
   'a.done': 'Tamam. Takım odanız hazır: {items} ZOLLER çözümü, +{hours} iş mili saati ve yılda {eur} katma değer.',
   'a.cta.solution': 'Çözümü göster', 'a.cta.gain': 'Kazancı göster', 'a.you': 'Siz', 'a.bot': 'Planlayıcı',
-  'composer.ph': 'Ekleyin veya değiştirin – örn. “2 Okuma daha”, “3 vardiya” ya da “toolBalancer olmadan”', 'composer.send': 'Gönder',
+  'composer.ph': 'Ekleyin veya değiştirin – örn. “2 Okuma daha”, “3 vardiya” ya da “toolBalancer olmadan”', 'composer.send': 'Gönder', 'composer.end': 'Sohbetin sonuna git',
   'prof.h': 'Üretiminiz', 'prof.machines': 'Tezgâh parkı', 'prof.production': 'Üretim', 'prof.today': 'Bugün', 'prof.add': 'Tezgâh ekle', 'prof.empty': 'Henüz tezgâh yok.',
   'prof.total': '{n} tezgâh', 'prof.assumed': 'varsayım', 'prof.dmi': 'z.DMI',
   'f.count': 'Adet', 'f.type': 'Tip', 'f.brand': 'Üretici', 'f.model': 'Seri', 'f.control': 'Kontrol ünitesi', 'f.holder': 'Bağlantı', 'f.value': 'Tezgâh değeri (€)',

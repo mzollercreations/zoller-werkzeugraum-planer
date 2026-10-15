@@ -161,7 +161,7 @@ export default {
   'a.more': 'あと {n} 個の簡単な質問で、計画がより正確になります。', 'a.skip': '質問をスキップ',
   'a.done': '完了しました。ツールルームの計画ができました：ZOLLER ソリューション {items} 件、年間 +{hours} 時間の主軸稼働、付加価値 {eur}。',
   'a.cta.solution': 'ソリューションを見る', 'a.cta.gain': '効果を見る', 'a.you': 'あなた', 'a.bot': 'プランナー',
-  'composer.ph': '追加・変更――例：「Okuma を 2 台追加」「3 交代」「toolBalancer なし」', 'composer.send': '送信',
+  'composer.ph': '追加・変更――例：「Okuma を 2 台追加」「3 交代」「toolBalancer なし」', 'composer.send': '送信', 'composer.end': 'チャットの最後へ',
   'prof.h': 'お客様の生産', 'prof.machines': '機械', 'prof.production': '生産', 'prof.today': '現状', 'prof.add': '機械を追加', 'prof.empty': 'まだ機械がありません。',
   'prof.total': '機械 {n} 台', 'prof.assumed': '想定', 'prof.dmi': 'z.DMI',
   'f.count': '台数', 'f.type': '種類', 'f.brand': 'メーカー', 'f.model': 'シリーズ', 'f.control': 'NC 装置', 'f.holder': 'ツールシャンク', 'f.value': '機械価格（€）',

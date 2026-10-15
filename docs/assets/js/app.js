@@ -70,11 +70,13 @@ const S = {
   step: 'intro', profile: freshProfile(), chat: [], queue: [], asked: new Set(), items: [], gain: null, hall: null,
   cad: new Map(),        // Maschinen-ID -> eigenes CAD-Modell (Object3D), nur im Browser
   first: true, mode: 'after',
+  chatSeen: 0, chatAnim: 0, anchor: null, followUntil: 0,   // Chat-Scrollen: schon gezeigte / schon eingeblendete Nachrichten, Anfang der laufenden Antwort
 };
 window.ZP = S;          // zum Nachsehen in der Konsole
 const STEP_IDS = ['profile', 'solution', 'room', 'gain', 'offer'];
 const app = $('[data-app]');
 const panel = $('[data-panel-inner]');
+panel.addEventListener('scroll', () => updJump(), { passive: true });
 
 // ------------------------------------------------------------------ Start
 init();
@@ -464,28 +466,68 @@ function renderTicker() {
 function renderPanel() {
   const fn = { intro: () => '', profile: panelProfile, solution: panelSolution, room: panelRoom, gain: panelGain, offer: panelOffer }[S.step] || (() => '');
   const st = panel.scrollTop;
+  if (S.lastStep === 'profile' && S.step !== 'profile') S.chatTop = st;   // Leseposition im Chat für die Rückkehr
   panel.innerHTML = fn();
   const foot = $('.panel__foot');
   if (foot) foot.remove();
   if (S.step === 'profile') {
     const f = document.createElement('div'); f.className = 'panel__foot';
-    f.innerHTML = `<form class="composer" data-composer><textarea rows="1" placeholder="${esc(t('composer.ph'))}"></textarea><button type="submit" aria-label="${esc(t('composer.send'))}"><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>`;
+    f.innerHTML = `<button type="button" class="jump" data-jump aria-label="${esc(t('composer.end'))}" title="${esc(t('composer.end'))}"><svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><form class="composer" data-composer><textarea rows="1" placeholder="${esc(t('composer.ph'))}"></textarea><button type="submit" aria-label="${esc(t('composer.send'))}"><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>`;
     $('[data-panel]').appendChild(f);
     const form = $('[data-composer]'), ta = $('textarea', form);
     form.addEventListener('submit', (e) => { e.preventDefault(); const v = ta.value.trim(); if (!v) return; ta.value = ''; say('you', esc(v)); handleText(v); });
     ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
     ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(128, ta.scrollHeight) + 'px'; });
-    panel.scrollTop = panel.scrollHeight;
+    $('[data-jump]', f).addEventListener('click', () => glide(panel, panel.scrollHeight));
+    followChat(st);
   } else panel.scrollTop = S.lastStep === S.step ? st : 0;
   S.lastStep = S.step;
   bindPanel();
   if (S.step === 'room') updateARButtons();
+  updJump();
+}
+
+// Chat-Scrollen: Eine neue Antwort wird ab ihrem Anfang gezeigt (mit der kurzen Frage davor), nicht ans Ende gesprungen –
+// lange Antworten müsste man sonst erst wieder hochscrollen. Ans Ende geht es über den Pfeil über dem Eingabefeld.
+function followChat(st) {
+  const n = S.chat.length, seen = Math.min(S.chatSeen, n);
+  S.chatSeen = n;
+  setTimeout(() => { S.chatAnim = S.chat.length; });   // alles aus diesem Durchlauf blendet ein, danach nicht mehr
+  const els = $$('.chat .msg', panel);
+  let lastYou = -1;
+  S.chat.forEach((m, i) => { if (m.who === 'you') lastYou = i; });
+  let b = -1;
+  for (let i = Math.max(seen, lastYou + 1); i < n; i++) if (S.chat[i].who === 'bot') { b = i; break; }
+  if (b < 0) {
+    if (performance.now() < S.followUntil) return;        // nicht in ein laufendes Hinscrollen fahren
+    if (n > seen) panel.scrollTop = panel.scrollHeight;   // eigene Nachricht gerade geschickt
+    else panel.scrollTop = S.lastStep === 'profile' ? st : S.chatTop ?? panel.scrollHeight;
+    return;
+  }
+  if (S.anchor == null) {   // mehrere Bot-Nachrichten im selben Durchlauf (Antwort + nächste Frage) teilen sich den Anfang
+    const q = b - 1;
+    S.anchor = q >= 0 && S.chat[q].who === 'you' && els[q] && els[q].offsetHeight < panel.clientHeight * .35 ? q : b;
+    setTimeout(() => { S.anchor = null; });
+  }
+  const el = els[S.anchor];
+  if (!el) { panel.scrollTop = panel.scrollHeight; return; }
+  panel.scrollTop = st;
+  S.followUntil = performance.now() + 900;
+  glide(panel, Math.min(topIn(el, panel) - 12, panel.scrollHeight - panel.clientHeight));
+}
+// sanft scrollen; in einem verdeckten Tab läuft keine Animation, dann sofort
+function glide(box, top) { if (document.hidden) box.scrollTop = top; else box.scrollTo({ top, behavior: 'smooth' }); }
+// Abstand eines Elements vom Inhaltsanfang des Scrollbereichs (Layoutmaß, unabhängig von Einblend-Animationen)
+function topIn(el, box) { let y = 0; for (let x = el; x && x !== box; x = x.offsetParent) y += x.offsetTop; return y; }
+function updJump() {
+  const b = $('[data-jump]'); if (!b) return;
+  b.classList.toggle('is-on', panel.scrollHeight - panel.scrollTop - panel.clientHeight > 48);
 }
 
 // ------------------------------------------------------------------ Panel: Fertigung
 function panelProfile() {
   const p = S.profile;
-  const chat = S.chat.map((m, i) => `<div class="msg msg--${m.who}">${m.html}${m.replies && !m.answered ? `<div class="replies">${m.replies.map((r, j) => `<button type="button" class="${r.soft ? 'is-soft' : ''}" data-reply="${i}:${j}">${esc(r.label)}</button>`).join('')}</div>` : ''}${m.replies && !m.answered && m.q && m.q !== 'machines' ? `<div style="margin-top:.5rem"><button class="link" style="font-size:.76rem;color:var(--ink3)" data-act="skip">${esc(t('a.skip'))}</button></div>` : ''}</div>`).join('');
+  const chat = S.chat.map((m, i) => `<div class="msg msg--${m.who}${i >= S.chatAnim ? ' is-new' : ''}">${m.html}${m.replies && !m.answered ? `<div class="replies">${m.replies.map((r, j) => `<button type="button" class="${r.soft ? 'is-soft' : ''}" data-reply="${i}:${j}">${esc(r.label)}</button>`).join('')}</div>` : ''}${m.replies && !m.answered && m.q && m.q !== 'machines' ? `<div style="margin-top:.5rem"><button class="link" style="font-size:.76rem;color:var(--ink3)" data-act="skip">${esc(t('a.skip'))}</button></div>` : ''}</div>`).join('');
   const n = p.machines.reduce((a, m) => a + m.count, 0);
   const ms = p.machines.map((m) => {
     const b = brandByName(m.brand);

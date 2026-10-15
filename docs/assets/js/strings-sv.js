@@ -161,7 +161,7 @@ export default {
   'a.more': '{n} {n|kort fråga|korta frågor} till, så blir planeringen exakt.', 'a.skip': 'Hoppa över frågorna',
   'a.done': 'Klart. Ert verktygsrum står: {items} ZOLLER-lösningar, +{hours} spindeltimmar och {eur} mervärde per år.',
   'a.cta.solution': 'Visa lösningen', 'a.cta.gain': 'Visa vinsten', 'a.you': 'Ni', 'a.bot': 'Planerare',
-  'composer.ph': 'Komplettera eller ändra – t.ex. ”2 Okuma till”, ”3 skift” eller ”utan toolBalancer”', 'composer.send': 'Skicka',
+  'composer.ph': 'Komplettera eller ändra – t.ex. ”2 Okuma till”, ”3 skift” eller ”utan toolBalancer”', 'composer.send': 'Skicka', 'composer.end': 'Till slutet av chatten',
   'prof.h': 'Er produktion', 'prof.machines': 'Maskinpark', 'prof.production': 'Produktion', 'prof.today': 'I dag', 'prof.add': 'Lägg till maskin', 'prof.empty': 'Inga maskiner än.',
   'prof.total': '{n} {n|maskin|maskiner}', 'prof.assumed': 'antagande', 'prof.dmi': 'z.DMI',
   'f.count': 'Antal', 'f.type': 'Typ', 'f.brand': 'Tillverkare', 'f.model': 'Serie', 'f.control': 'Styrsystem', 'f.holder': 'Hållare', 'f.value': 'Maskinvärde (€)',
